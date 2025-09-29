@@ -58,17 +58,23 @@ curl -s http://localhost:8083/actuator/health   # Plaid Service
 ```bash
 curl -s -H "Content-Type: application/json"   -d '[{"date":"2025-09-29","amount":-50.00,"description":"Test debit"}]'   "http://localhost:8082/api/ledger/events?userId=1"
 ```
+Think of ledger-service as your “scratchpad” for things you told the app you paid but that haven’t posted at the bank yet.
+	•	Endpoint: POST http://localhost:8082/api/ledger/events?userId=1
+	•	Body: array of events. Negative = money going out (bills), positive = money coming in (paycheck).
 
 ### ✅ Get Current Balance (Plaid Mock)
 ```bash
 curl -s "http://localhost:8083/api/plaid/balance?userId=1"
 ```
+plaid-service simulates “what your bank says right now.”
+	•	Endpoint: GET http://localhost:8083/api/plaid/balance?userId=1
 
 ### ✅ Get Projected Balance (Aggregated)
 ```bash
 curl -s "http://localhost:8080/api/balance/running?userId=1"
 ```
-
+balance-service combines (2) the real-time bank balance with (1) your pending ledger events to show a projected balance.
+	•	Endpoint: GET http://localhost:8080/api/balance/running?userId=1
 ---
 
 ## 📚 Swagger UIs
