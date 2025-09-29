@@ -1,0 +1,64 @@
+# docker-compose.yml
+services:
+  ledger-service:
+    build: ./ledger-service
+    image: ledger-service:local
+    ports:
+      - "8082:8082"
+    environment:
+      SERVER_PORT: 8082
+      SPRING_APPLICATION_NAME: ledger-service
+      MANAGEMENT_SERVER_PORT: 8082
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8082/actuator/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 15s
+    restart: unless-stopped
+
+  plaid-service:
+    build: ./plaid-service
+    image: plaid-service:local
+    ports:
+      - "8083:8083"
+    environment:
+      SERVER_PORT: 8083
+      SPRING_APPLICATION_NAME: plaid-service
+      MANAGEMENT_SERVER_PORT: 8083
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8083/actuator/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 15s
+    restart: unless-stopped
+
+  balance-service:
+    build: ./balance-service
+    image: balance-service:local
+    ports:
+      - "8080:8080"
+    environment:
+      SERVER_PORT: 8080
+      SPRING_APPLICATION_NAME: balance-service
+      MANAGEMENT_SERVER_PORT: 8080
+      # point to service names on the compose network (NOT localhost)
+      LEDGER_BASE_URL: http://ledger-service:8082
+      PLAID_BASE_URL:  http://plaid-service:8083
+    depends_on:
+      ledger-service:
+        condition: service_healthy
+      plaid-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8080/actuator/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 20s
+    restart: unless-stopped
+
+networks:
+  default:
+    name: bpnet
