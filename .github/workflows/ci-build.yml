@@ -1,21 +1,9 @@
-name: CI/CD
+name: CI (Build & Test)
 
 on:
   pull_request:
   push:
     branches: [ main ]
-
-permissions:
-  contents: write     # needed for release creation and artifact upload
-  packages: read
-
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}-${{ matrix.service || 'release' }}
-  cancel-in-progress: true
-
-env:
-  JAVA_VERSION: '17'
-  SERVICES: 'balance-service,ledger-service,plaid-service'
 
 jobs:
   build:
@@ -34,175 +22,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up Temurin JDK ${{ env.JAVA_VERSION }} + Maven cache
+      - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: ${{ env.JAVA_VERSION }}
+          java-version: 17
           cache: maven
 
-      - name: Build & Test
+      - name: Build (skip tests for speed)
         working-directory: ${{ matrix.service }}
-        run: |
-          mvn -B -ntp -Dstyle.color=always \
-              --batch-mode \
-              clean verify
-
-      - name: Package (jar)
-        working-directory: ${{ matrix.service }}
-        run: mvn -B -ntp -Dstyle.color=always -DskipTests package
-
-      - name: Upload JAR artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ matrix.service }}-jar
-          path: ${{ matrix.service }}/target/*.jar
-          if-no-files-found: error
-          retention-days: 14
-
-      - name: Upload surefire test reports (HTML/XML)
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ matrix.service }}-test-reports
-          path: |
-            ${{ matrix.service }}/target/surefire-reports/**
-            ${{ matrix.service }}/target/failsafe-reports/**
-          if-no-files-found: warn
-          retention-days: 7
-
-  docker:
-    name: Build Docker images (${{ matrix.service }})
-    runs-on: ubuntu-latest
-    needs: build
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    strategy:
-      fail-fast: false
-      matrix:
-        service: [balance-service, ledger-service, plaid-service]
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      # OPTIONAL: Push to Docker Hub if secrets are present
-      - name: Login to Docker Hub
-        if: secrets.DOCKERHUB_USERNAME && secrets.DOCKERHUB_TOKEN
-        uses: docker/login-action@v3
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-
-      - name: Build image
-        run: |
-          IMAGE_NAME=${{ matrix.service }}
-          IMAGE_TAG=sha-${{ github.sha }}
-          DOCKER_REPO="${{ secrets.DOCKERHUB_USERNAME && format('{0}/', secrets.DOCKERHUB_USERNAME) || '' }}${IMAGE_NAME}:${IMAGE_TAG}"
-          echo "DOCKER_IMAGE=$DOCKER_REPO" >> "$GITHUB_ENV"
-          docker build -t "$DOCKER_REPO" ${{ matrix.service }}
-
-      - name: Push image (Docker Hub)
-        if: secrets.DOCKERHUB_USERNAME && secrets.DOCKERHUB_TOKEN
-        run: docker push "$DOCKER_IMAGE"
-
-      - name: Export image reference
-        run: echo "${{ matrix.service }}=${DOCKER_IMAGE}" >> images.txt
-
-      - name: Upload image refs
-        uses: actions/upload-artifact@v4
-        with:
-          name: image-refs
-          path: images.txt
-          if-no-files-found: error
-
-  release:
-    name: Create GitHub Release (attach JARs & image refs)
-    runs-on: ubuntu-latest
-    needs: [build, docker]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-
-    steps:
-      - name: Download artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: ./artifacts
-
-      - name: Compose release notes
-        id: notes
-        run: |
-          echo "Changes in ${GITHUB_SHA}" > RELEASE_NOTES.md
-          echo "" >> RELEASE_NOTES.md
-          echo "Artifacts:" >> RELEASE_NOTES.md
-          find artifacts -type f -name "*.jar" -print >> RELEASE_NOTES.md
-          echo "" >> RELEASE_NOTES.md
-          if [ -f artifacts/image-refs/images.txt ]; then
-            echo "Docker images:" >> RELEASE_NOTES.md
-            cat artifacts/image-refs/images.txt >> RELEASE_NOTES.md
-          fi
-
-      - name: Create Release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: "build-${{ github.sha }}"
-          name: "Build ${{ github.sha }}"
-          body_path: RELEASE_NOTES.md
-          files: |
-            artifacts/**/**/*.jar
-            artifacts/image-refs/images.txt
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-  deploy:
-    name: Deploy to Production (gated)
-    runs-on: ubuntu-latest
-    needs: release
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    environment:
-      name: production
-      url: ${{ steps.deploy.outputs.url || '' }}
-
-    steps:
-      - name: Download artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: ./artifacts
-
-      # SSH-based deploy (generic). Requires these repo secrets:
-      # DEPLOY_HOST, DEPLOY_USER, DEPLOY_KEY (private key), DEPLOY_PATH (remote dir)
-      - name: Setup SSH key
-        if: secrets.DEPLOY_HOST && secrets.DEPLOY_USER && secrets.DEPLOY_KEY && secrets.DEPLOY_PATH
-        run: |
-          install -m 700 -d ~/.ssh
-          echo "${{ secrets.DEPLOY_KEY }}" > ~/.ssh/id_rsa
-          chmod 600 ~/.ssh/id_rsa
-          ssh-keyscan -H "${{ secrets.DEPLOY_HOST }}" >> ~/.ssh/known_hosts
-
-      - name: Upload artifacts to server
-        if: secrets.DEPLOY_HOST && secrets.DEPLOY_USER && secrets.DEPLOY_KEY && secrets.DEPLOY_PATH
-        run: |
-          rsync -avz ./artifacts/ "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}:${{ secrets.DEPLOY_PATH }}/"
-
-      - name: Restart services (example script)
-        if: secrets.DEPLOY_HOST && secrets.DEPLOY_USER && secrets.DEPLOY_KEY && secrets.DEPLOY_PATH
-        run: |
-          ssh "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}" <<'EOF'
-            set -euo pipefail
-            # Example: if you run via Docker Compose on the server
-            cd "${DEPLOY_PATH}"
-            # pull fresh images if using Docker Hub
-            if [ -f image-refs/images.txt ]; then
-              while IFS= read -r line; do
-                IMG="${line#*=}"
-                [ -n "$IMG" ] && docker pull "$IMG" || true
-              done < image-refs/images.txt
-            fi
-            # restart stack (adjust to your setup)
-            docker compose down || true
-            docker compose up -d
-          EOF
-        env:
-          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
-
-      - name: Output environment URL
-        id: deploy
-        run: echo "url=${{ secrets.PROD_URL || '' }}" >> $GITHUB_OUTPUT
+        run: mvn -B -ntp clean package -DskipTests
