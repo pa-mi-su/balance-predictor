@@ -1,0 +1,21 @@
+# Build outputs
+**/target/
+**/out/
+*.jar
+*.war
+*.log
+
+# IDE
+.idea/
+*.iml
+.vscode/
+.project
+.classpath
+.settings/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker
+**/.env

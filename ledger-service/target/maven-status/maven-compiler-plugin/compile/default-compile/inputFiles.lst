@@ -1,6 +1,0 @@
-/Users/pms/Documents/Projects/Java/balance-predictor/ledger-service/src/main/java/com.example.ledger/LedgerServiceApplication.java
-/Users/pms/Documents/Projects/Java/balance-predictor/ledger-service/src/main/java/com.example.ledger/config/OpenApiConfig.java
-/Users/pms/Documents/Projects/Java/balance-predictor/ledger-service/src/main/java/com/example/ledger/model/PendingEvent.java
-/Users/pms/Documents/Projects/Java/balance-predictor/ledger-service/src/main/java/com/example/ledger/repo/PendingEventRepository.java
-/Users/pms/Documents/Projects/Java/balance-predictor/ledger-service/src/main/java/com/example/ledger/service/LedgerService.java
-/Users/pms/Documents/Projects/Java/balance-predictor/ledger-service/src/main/java/com/example/ledger/web/LedgerController.java

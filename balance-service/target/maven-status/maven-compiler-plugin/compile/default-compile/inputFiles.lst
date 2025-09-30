@@ -1,7 +1,0 @@
-/Users/pms/Documents/Projects/Java/balance-predictor/balance-service/src/main/java/com.example.balance/BalanceServiceApplication.java
-/Users/pms/Documents/Projects/Java/balance-predictor/balance-service/src/main/java/com.example.balance/config/OpenApiConfig.java
-/Users/pms/Documents/Projects/Java/balance-predictor/balance-service/src/main/java/com/example/balance/model/AccountBalance.java
-/Users/pms/Documents/Projects/Java/balance-predictor/balance-service/src/main/java/com/example/balance/model/PendingEvent.java
-/Users/pms/Documents/Projects/Java/balance-predictor/balance-service/src/main/java/com/example/balance/model/Projection.java
-/Users/pms/Documents/Projects/Java/balance-predictor/balance-service/src/main/java/com/example/balance/service/BalanceCalcService.java
-/Users/pms/Documents/Projects/Java/balance-predictor/balance-service/src/main/java/com/example/balance/web/BalanceController.java

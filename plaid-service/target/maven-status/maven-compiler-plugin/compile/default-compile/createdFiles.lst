@@ -1,5 +1,0 @@
-com/example/plaid/config/OpenApiConfig.class
-com/example/plaid/service/MockPlaidService.class
-com/example/plaid/PlaidServiceApplication.class
-com/example/plaid/model/AccountBalance.class
-com/example/plaid/web/PlaidController.class
