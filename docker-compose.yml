@@ -9,6 +9,7 @@ services:
       SERVER_PORT: 8082
       SPRING_APPLICATION_NAME: ledger-service
       MANAGEMENT_SERVER_PORT: 8082
+      EUREKA_DEFAULT_ZONE: http://eureka-server:8761/eureka  # <-- add
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://localhost:8082/actuator/health"]
       interval: 5s
@@ -26,6 +27,7 @@ services:
       SERVER_PORT: 8083
       SPRING_APPLICATION_NAME: plaid-service
       MANAGEMENT_SERVER_PORT: 8083
+      EUREKA_DEFAULT_ZONE: http://eureka-server:8761/eureka  # <-- add
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://localhost:8083/actuator/health"]
       interval: 5s
@@ -43,6 +45,7 @@ services:
       SERVER_PORT: 8080
       SPRING_APPLICATION_NAME: balance-service
       MANAGEMENT_SERVER_PORT: 8080
+      EUREKA_DEFAULT_ZONE: http://eureka-server:8761/eureka  # <-- add
       # point to service names on the compose network (NOT localhost)
       LEDGER_BASE_URL: http://ledger-service:8082
       PLAID_BASE_URL:  http://plaid-service:8083
@@ -58,6 +61,20 @@ services:
       retries: 30
       start_period: 20s
     restart: unless-stopped
+
+  eureka-server:
+    build: ./eureka-server
+    image: eureka-server:local
+    container_name: eureka-server
+    ports:
+      - "8761:8761"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8761/actuator/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 15s
 
 networks:
   default:
