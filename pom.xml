@@ -1,17 +1,23 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0"
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
-                             http://maven.apache.org/xsd/maven-4.0.0.xsd">
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
+
+    <!-- Parent: Spring Boot for dependency & plugin management -->
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>3.3.3</version>
+        <relativePath/> <!-- always fetch from repo -->
+    </parent>
 
     <groupId>com.balancepredictor</groupId>
     <artifactId>balance-predictor</artifactId>
     <version>1.0.0</version>
     <packaging>pom</packaging>
-    <name>balance-predictor (aggregator)</name>
-    <description>Root aggregator for multi-module build</description>
+    <name>balance-predictor</name>
+    <description>Root parent/aggregator for the Balance Predictor services</description>
 
-    <!-- Stage 1: keep modules self-contained; no parent/depMgmt changes yet -->
     <modules>
         <module>balance-service</module>
         <module>ledger-service</module>
@@ -20,7 +26,33 @@
     </modules>
 
     <properties>
-        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <maven.compiler.release>17</maven.compiler.release>
+        <java.version>17</java.version>
+        <spring-cloud.version>2023.0.3</spring-cloud.version>
     </properties>
+
+    <!-- Centralize Spring Cloud versions -->
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>org.springframework.cloud</groupId>
+                <artifactId>spring-cloud-dependencies</artifactId>
+                <version>${spring-cloud.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
+    <!-- Inherit Boot plugin to all modules (repackage, layers, etc.) -->
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+                <configuration>
+                    <layers enabled="true"/>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
 </project>
