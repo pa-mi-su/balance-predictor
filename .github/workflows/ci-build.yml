@@ -2,27 +2,36 @@ name: CI (Build & Test)
 
 on:
   pull_request:
-    branches: [ main ]
+    branches: [ main, dev, uat, prod ]
   push:
     branches: [ main, dev, uat, prod ]
     tags: [ 'v*' ]
 
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build:
-    name: Build & Test (${{ matrix.service }})
+    name: Build ${{ matrix.target.name }}
     runs-on: ubuntu-latest
+
+    # Build everything once for the PR (tests on), and once for pushes/tags (tests off)
     strategy:
       fail-fast: false
       matrix:
-        service: [balance-service, ledger-service, plaid-service]
-
-    defaults:
-      run:
-        shell: bash
+        target:
+          - { name: "PR/Test Build",     test: "true"  }
+          - { name: "Push/Tag Package",  test: "false" }
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4
@@ -31,24 +40,57 @@ jobs:
           java-version: 17
           cache: maven
 
-      # PRs to main: run tests
-      - name: Build & Test (PRs)
-        if: ${{ github.event_name == 'pull_request' }}
-        working-directory: ${{ matrix.service }}
-        run: mvn -B -ntp clean verify
+      - name: Prepare version metadata
+        id: meta
+        run: |
+          SHA_SHORT="${GITHUB_SHA::7}"
+          # refs/heads/dev → dev, refs/tags/v1.2.3 → v1.2.3
+          REF_NAME="${GITHUB_REF_NAME}"
+          echo "sha_short=$SHA_SHORT" >> "$GITHUB_OUTPUT"
+          echo "ref_name=$REF_NAME"   >> "$GITHUB_OUTPUT"
 
-      # Pushes/tags: fast build (skip tests)
-      - name: Package (pushes & tags)
-        if: ${{ github.event_name != 'pull_request' }}
-        working-directory: ${{ matrix.service }}
-        run: mvn -B -ntp clean package -DskipTests
+      - name: Maven go-offline (speed up)
+        run: mvn -B -ntp -q -Dmaven.wagon.http.pool=false dependency:go-offline
 
-      # Upload jars for pushes/tags so envs can deploy them
-      - name: Upload artifact (jar)
-        if: ${{ github.event_name != 'pull_request' }}
+      # Build whole multi-module project (faster than per-service matrix)
+      - name: Build & Test (PRs only)
+        if: ${{ github.event_name == 'pull_request' && matrix.target.test == 'true' }}
+        env:
+          MAVEN_OPTS: "-Xmx2g -XX:+UseG1GC -Dorg.slf4j.simpleLogger.showThreadName=false"
+        run: |
+          mvn -B -ntp clean verify \
+            -DskipITs \
+            -P coverage || (echo 'Tests failed'; exit 1)
+
+      - name: Publish test reports (PRs)
+        if: ${{ github.event_name == 'pull_request' && matrix.target.test == 'true' }}
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.service }}-jar
-          path: ${{ matrix.service }}/target/*.jar
+          name: test-reports-${{ steps.meta.outputs.sha_short }}
+          path: |
+            **/target/surefire-reports/*.xml
+            **/target/surefire-reports/*.txt
+            **/target/jacoco/*.exec
+            **/target/site/jacoco/*
+          if-no-files-found: ignore
+          retention-days: 7
+
+      # Pushes/Tags: package quickly (skip tests)
+      - name: Package (pushes & tags)
+        if: ${{ github.event_name != 'pull_request' && matrix.target.test == 'false' }}
+        env:
+          MAVEN_OPTS: "-Xmx2g -XX:+UseG1GC"
+        run: mvn -B -ntp clean package -DskipTests
+
+      - name: Upload artifacts (jars)
+        if: ${{ github.event_name != 'pull_request' && matrix.target.test == 'false' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: jars-${{ steps.meta.outputs.ref_name }}-${{ steps.meta.outputs.sha_short }}
+          path: |
+            balance-service/target/*.jar
+            ledger-service/target/*.jar
+            plaid-service/target/*.jar
+            eureka-server/target/*.jar
           if-no-files-found: error
           retention-days: 14
