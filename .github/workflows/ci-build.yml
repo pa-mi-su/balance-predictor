@@ -2,8 +2,10 @@ name: CI (Build & Test)
 
 on:
   pull_request:
-  push:
     branches: [ main ]
+  push:
+    branches: [ main, dev, uat, prod ]
+    tags: [ 'v*' ]
 
 jobs:
   build:
@@ -29,6 +31,24 @@ jobs:
           java-version: 17
           cache: maven
 
-      - name: Build (skip tests for speed)
+      # PRs to main: run tests
+      - name: Build & Test (PRs)
+        if: ${{ github.event_name == 'pull_request' }}
+        working-directory: ${{ matrix.service }}
+        run: mvn -B -ntp clean verify
+
+      # Pushes/tags: fast build (skip tests)
+      - name: Package (pushes & tags)
+        if: ${{ github.event_name != 'pull_request' }}
         working-directory: ${{ matrix.service }}
         run: mvn -B -ntp clean package -DskipTests
+
+      # Upload jars for pushes/tags so envs can deploy them
+      - name: Upload artifact (jar)
+        if: ${{ github.event_name != 'pull_request' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.service }}-jar
+          path: ${{ matrix.service }}/target/*.jar
+          if-no-files-found: error
+          retention-days: 14
