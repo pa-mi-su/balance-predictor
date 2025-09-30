@@ -1,0 +1,26 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+                             http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>com.balancepredictor</groupId>
+    <artifactId>balance-predictor</artifactId>
+    <version>1.0.0</version>
+    <packaging>pom</packaging>
+    <name>balance-predictor (aggregator)</name>
+    <description>Root aggregator for multi-module build</description>
+
+    <!-- Stage 1: keep modules self-contained; no parent/depMgmt changes yet -->
+    <modules>
+        <module>balance-service</module>
+        <module>ledger-service</module>
+        <module>plaid-service</module>
+        <module>eureka-server</module>
+    </modules>
+
+    <properties>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <maven.compiler.release>17</maven.compiler.release>
+    </properties>
+</project>
