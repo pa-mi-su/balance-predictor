@@ -17,7 +17,6 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -34,17 +33,14 @@ jobs:
       - name: Maven go-offline
         run: mvn -B -ntp -q dependency:go-offline
 
-      # PRs: full build + tests
       - name: Build & Test (PRs)
         if: ${{ github.event_name == 'pull_request' }}
         run: mvn -B -ntp clean verify
 
-      # Pushes/Tags: fast package (skip tests)
       - name: Package (pushes & tags)
         if: ${{ github.event_name != 'pull_request' }}
         run: mvn -B -ntp clean package -DskipTests
 
-      # Upload all module jars on pushes/tags
       - name: Upload artifacts
         if: ${{ github.event_name != 'pull_request' }}
         uses: actions/upload-artifact@v4
