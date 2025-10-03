@@ -11,7 +11,6 @@ services:
       SPRING_APPLICATION_NAME: eureka-server
       SERVER_PORT: 8761
       MANAGEMENT_SERVER_PORT: 8761
-      # Eureka server should not try to register/fetch itself
       EUREKA_CLIENT_REGISTER_WITH_EUREKA: "false"
       EUREKA_CLIENT_FETCH_REGISTRY: "false"
     healthcheck:
@@ -28,12 +27,11 @@ services:
       dockerfile: ledger-service/Dockerfile
     image: ledger-service:local
     ports:
-      - "8082:8082"
+      - "8082:8082" # keep for local dev/Swagger; can remove in prod
     environment:
       SPRING_APPLICATION_NAME: ledger-service
       SERVER_PORT: 8082
       MANAGEMENT_SERVER_PORT: 8082
-      # Correct env var name for defaultZone
       EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8761/eureka
     depends_on:
       eureka-server:
@@ -52,7 +50,7 @@ services:
       dockerfile: plaid-service/Dockerfile
     image: plaid-service:local
     ports:
-      - "8083:8083"
+      - "8083:8083" # keep for local dev/Swagger; can remove in prod
     environment:
       SPRING_APPLICATION_NAME: plaid-service
       SERVER_PORT: 8083
@@ -81,9 +79,7 @@ services:
       SERVER_PORT: 8080
       MANAGEMENT_SERVER_PORT: 8080
       EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8761/eureka
-      # point to service names on the compose network (NOT localhost)
-      LEDGER_BASE_URL: http://ledger-service:8082
-      PLAID_BASE_URL:  http://plaid-service:8083
+      # (removed) LEDGER_BASE_URL / PLAID_BASE_URL — now resolved via Eureka
     depends_on:
       eureka-server:
         condition: service_healthy

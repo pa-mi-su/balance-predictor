@@ -1,0 +1,150 @@
+{
+  "info": {
+    "name": "Balance Predictor",
+    "_postman_id": "b74a6d3a-3e64-4d2f-9c9b-collection-local",
+    "description": "Postman collection for Balance Predictor microservices (Eureka, Balance, Ledger, Plaid).",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "Eureka health",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{eureka_base}}/actuator/health"
+          },
+          "response": []
+        },
+        {
+          "name": "Balance health",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{balance_base}}/actuator/health"
+          },
+          "response": []
+        },
+        {
+          "name": "Ledger health",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{ledger_base}}/actuator/health"
+          },
+          "response": []
+        },
+        {
+          "name": "Plaid health",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{plaid_base}}/actuator/health"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Ledger Service",
+      "item": [
+        {
+          "name": "Add events (POST)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{ledger_base}}/api/ledger/events?userId={{userId}}",
+              "host": [
+                "{{ledger_base}}"
+              ],
+              "path": [
+                "api",
+                "ledger",
+                "events"
+              ],
+              "query": [
+                {
+                  "key": "userId",
+                  "value": "{{userId}}"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "[\n  {\n    \"date\": \"2025-09-29\",\n    \"amount\": -50.0,\n    \"description\": \"Test debit\"\n  },\n  {\n    \"date\": \"2025-09-30\",\n    \"amount\": 200.0,\n    \"description\": \"Paycheck\"\n  }\n]"
+            },
+            "description": "Negative = debit (money out). Positive = credit (money in)."
+          },
+          "response": []
+        },
+        {
+          "name": "Get events (GET)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{ledger_base}}/api/ledger/events?userId={{userId}}"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Plaid Service (mock)",
+      "item": [
+        {
+          "name": "Get current balance",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{plaid_base}}/api/plaid/balance?userId={{userId}}"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Balance Service (aggregated)",
+      "item": [
+        {
+          "name": "Get projected balance",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{balance_base}}/api/balance/running?userId={{userId}}"
+          },
+          "response": []
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "userId",
+      "value": "1"
+    },
+    {
+      "key": "eureka_base",
+      "value": "http://localhost:8761"
+    },
+    {
+      "key": "balance_base",
+      "value": "http://localhost:8080"
+    },
+    {
+      "key": "ledger_base",
+      "value": "http://localhost:8082"
+    },
+    {
+      "key": "plaid_base",
+      "value": "http://localhost:8083"
+    }
+  ]
+}
