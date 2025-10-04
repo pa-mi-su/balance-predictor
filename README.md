@@ -1,8 +1,8 @@
 # Balance Predictor
 
-[![Build](https://img.shields.io/badge/build-passing-brightgreen)]()
+[![CI](https://github.com/pa-mi-su/balance-predictor/actions/workflows/ci.yml/badge.svg)](https://github.com/pa-mi-su/balance-predictor/actions/workflows/ci.yml)
 [![Docker](https://img.shields.io/badge/docker-ready-blue)]()
-[![License](https://img.shields.io/badge/license-MIT-green)]()
+[![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Java](https://img.shields.io/badge/java-17-orange)]()
 [![Spring Boot](https://img.shields.io/badge/springboot-3.3.3-brightgreen)]()
 [![Spring Cloud](https://img.shields.io/badge/springcloud-2023.0.3-blue)]()
@@ -28,7 +28,7 @@ It demonstrates real-world patterns like **service discovery**, **API aggregatio
 - **Java 17**
 - **Spring Boot 3.3.3**
 - **Spring Cloud 2023.0.3 (Eureka Server + Client, LoadBalancer)**
-- **Spring WebFlux (WebClient)** for async HTTP calls
+- **Spring WebFlux (WebClient)** with `@LoadBalanced` for service discovery
 - **Docker & Docker Compose** for containerization
 - **Springdoc OpenAPI** for Swagger UI
 - **GitHub Actions** for CI/CD pipelines
@@ -79,6 +79,9 @@ curl -s "http://localhost:8083/api/plaid/balance?userId=1"
 curl -s "http://localhost:8080/api/balance/running?userId=1"
 ```
 
+ℹ️ **Note:** Balance Service no longer needs `LEDGER_BASE_URL` or `PLAID_BASE_URL`.  
+It resolves `ledger-service` and `plaid-service` automatically via **Eureka service discovery**.
+
 ---
 
 ## 📚 Swagger UIs
@@ -93,13 +96,13 @@ curl -s "http://localhost:8080/api/balance/running?userId=1"
 1. Add some debit/credit events in Ledger Service.  
 2. Check current balance from Plaid Service (mock).  
 3. Get aggregated projected balance from Balance Service.  
-4. View service registration in the Eureka Dashboard at `http://localhost:8761`.  
+4. View service registration in the **Eureka Dashboard** at `http://localhost:8761`.  
 
 ---
 
 ## 🔗 Networking
 All services are attached to the custom Docker network **`bpnet`**.  
-This allows them to resolve each other by container name (`ledger-service`, `plaid-service`, `eureka-server`) instead of `localhost`.
+Services resolve each other by **logical service ID** via **Eureka** (`ledger-service`, `plaid-service`, `balance-service`), no hardcoded URLs required.
 
 ---
 
