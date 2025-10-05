@@ -13,6 +13,7 @@ It demonstrates real-world patterns like **service discovery**, **API aggregatio
 ---
 
 ## 🚀 Features
+- **API Gateway (NEW)** → Central entry point for all services using **Spring Cloud Gateway**, routing requests to backend services through **Eureka Discovery**.
 - **Balance Service** → Aggregates data from Ledger & Plaid services and calculates projected balances.
 - **Ledger Service** → Stores and returns user debit/credit events.
 - **Plaid Service (Mock)** → Simulates a bank API returning current balance information.
@@ -27,7 +28,7 @@ It demonstrates real-world patterns like **service discovery**, **API aggregatio
 ## 🛠️ Tech Stack
 - **Java 17**
 - **Spring Boot 3.3.3**
-- **Spring Cloud 2023.0.3 (Eureka Server + Client, LoadBalancer)**
+- **Spring Cloud 2023.0.3 (Eureka Server + Client, LoadBalancer, Gateway)**
 - **Spring WebFlux (WebClient)** with `@LoadBalanced` for service discovery
 - **Docker & Docker Compose** for containerization
 - **Springdoc OpenAPI** for Swagger UI
@@ -58,13 +59,64 @@ curl -s http://localhost:8761/actuator/health   # Eureka Server
 curl -s http://localhost:8080/actuator/health   # Balance Service
 curl -s http://localhost:8082/actuator/health   # Ledger Service
 curl -s http://localhost:8083/actuator/health   # Plaid Service
+curl -s http://localhost:8081/actuator/health   # API Gateway
 ```
 
 ---
 
-## 📖 API Usage
+## 🌉 API Gateway Overview
 
-### ✅ Add Ledger Events (Debits / Credits)
+The **API Gateway** (Spring Cloud Gateway) runs on **port 8081** and provides a unified access layer to all backend services.  
+It uses **Eureka service discovery** to dynamically route traffic without hardcoded URLs.
+
+### Default Routes
+
+| Service | Gateway Route | Target Service (via Eureka) |
+|----------|----------------|-----------------------------|
+| Balance Service | `/api/balance/**` | `lb://balance-service` |
+| Ledger Service  | `/api/ledger/**`  | `lb://ledger-service`  |
+| Plaid Service   | `/api/plaid/**`   | `lb://plaid-service`   |
+
+Each route applies a `StripPrefix=1` filter, so `/api/balance/foo` maps to `/foo` on the target service.
+
+---
+
+### Example API Gateway Requests
+
+#### ✅ Health Checks
+```bash
+# Gateway itself
+curl -s http://localhost:8081/actuator/health
+
+# Via Gateway → Plaid
+curl -s http://localhost:8081/plaid-service/actuator/health
+
+# Via Gateway → Ledger
+curl -s http://localhost:8081/ledger-service/actuator/health
+
+# Via Gateway → Balance
+curl -s http://localhost:8081/balance-service/actuator/health
+```
+
+#### ✅ End-to-End Flow
+```bash
+# Get mock Plaid balance
+curl -s "http://localhost:8081/api/plaid/balance?userId=1"
+
+# Add ledger events (POST)
+curl -s -H "Content-Type: application/json"   -d '[{"date":"2025-10-04","amount":-50.0,"description":"Test debit"}]'   "http://localhost:8081/api/ledger/events?userId=1"
+
+# Get projected balance
+curl -s "http://localhost:8081/api/balance/running?userId=1"
+```
+
+---
+
+## 📖 API Usage (Direct Services)
+
+> You can still hit services directly on their own ports if needed.
+
+### ✅ Add Ledger Events
 ```bash
 curl -s -H "Content-Type: application/json"   -d '[{"date":"2025-09-29","amount":-50.00,"description":"Test debit"}]'   "http://localhost:8082/api/ledger/events?userId=1"
 ```
@@ -78,9 +130,6 @@ curl -s "http://localhost:8083/api/plaid/balance?userId=1"
 ```bash
 curl -s "http://localhost:8080/api/balance/running?userId=1"
 ```
-
-ℹ️ **Note:** Balance Service no longer needs `LEDGER_BASE_URL` or `PLAID_BASE_URL`.  
-It resolves `ledger-service` and `plaid-service` automatically via **Eureka service discovery**.
 
 ---
 
@@ -96,13 +145,27 @@ It resolves `ledger-service` and `plaid-service` automatically via **Eureka serv
 1. Add some debit/credit events in Ledger Service.  
 2. Check current balance from Plaid Service (mock).  
 3. Get aggregated projected balance from Balance Service.  
-4. View service registration in the **Eureka Dashboard** at `http://localhost:8761`.  
+4. Optionally, route all requests through the API Gateway on `:8081`.  
+5. View service registration in the **Eureka Dashboard** at `http://localhost:8761`.
 
 ---
 
 ## 🔗 Networking
 All services are attached to the custom Docker network **`bpnet`**.  
-Services resolve each other by **logical service ID** via **Eureka** (`ledger-service`, `plaid-service`, `balance-service`), no hardcoded URLs required.
+Services resolve each other by **logical service ID** via **Eureka** (`ledger-service`, `plaid-service`, `balance-service`, `api-gateway`).
+
+---
+
+## 🧰 Postman Collection (Gateway Edition)
+We provide an updated **Postman collection** configured for gateway-based routing.
+
+### Import Instructions:
+1. Import `postman/BalancePredictor-Gateway.postman_collection.json` into Postman.  
+2. Verify environment variables:
+   - `gateway_base = http://localhost:8081`
+   - `eureka_base = http://localhost:8761`
+   - `userId = 1`
+3. Run the **“Health”** and **“Balance Service (via gateway)”** requests to confirm full routing.
 
 ---
 
@@ -117,6 +180,7 @@ GitHub Actions workflow:
 ## 📂 Project Structure
 ```
 balance-predictor/
+├── api-gateway/         # Spring Cloud Gateway service
 ├── balance-service/     # Aggregator service
 ├── ledger-service/      # Transaction storage
 ├── plaid-service/       # Mock bank API
@@ -125,15 +189,6 @@ balance-predictor/
 ├── pom.xml              # Root aggregator POM
 └── README.md
 ```
-
----
-
-## 🧰 Postman Collection
-We provide a ready-to-use **Postman Collection** with all endpoints pre-configured.
-
-1. Import `postman/BalancePredictor.postman_collection.json` into Postman.  
-2. Use the predefined environment (`localhost`) or update to match your deployed environment.  
-3. Run the **Collection Runner** for end-to-end testing.  
 
 ---
 

@@ -27,12 +27,12 @@ services:
       dockerfile: ledger-service/Dockerfile
     image: ledger-service:local
     ports:
-      - "8082:8082" # keep for local dev/Swagger; can remove in prod
+      - "8082:8082"
     environment:
       SPRING_APPLICATION_NAME: ledger-service
       SERVER_PORT: 8082
       MANAGEMENT_SERVER_PORT: 8082
-      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8761/eureka
+      EUREKA_DEFAULT_ZONE: http://eureka-server:8761/eureka   # ← changed
     depends_on:
       eureka-server:
         condition: service_healthy
@@ -50,12 +50,12 @@ services:
       dockerfile: plaid-service/Dockerfile
     image: plaid-service:local
     ports:
-      - "8083:8083" # keep for local dev/Swagger; can remove in prod
+      - "8083:8083"
     environment:
       SPRING_APPLICATION_NAME: plaid-service
       SERVER_PORT: 8083
       MANAGEMENT_SERVER_PORT: 8083
-      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8761/eureka
+      EUREKA_DEFAULT_ZONE: http://eureka-server:8761/eureka   # ← changed
     depends_on:
       eureka-server:
         condition: service_healthy
@@ -78,8 +78,8 @@ services:
       SPRING_APPLICATION_NAME: balance-service
       SERVER_PORT: 8080
       MANAGEMENT_SERVER_PORT: 8080
-      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8761/eureka
-      # (removed) LEDGER_BASE_URL / PLAID_BASE_URL — now resolved via Eureka
+      EUREKA_DEFAULT_ZONE: http://eureka-server:8761/eureka   # ← changed
+      # LEDGER/PLAID base URLs removed (Eureka used instead)
     depends_on:
       eureka-server:
         condition: service_healthy
@@ -89,6 +89,35 @@ services:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://localhost:8080/actuator/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 20s
+    restart: unless-stopped
+
+  api-gateway:
+    build:
+      context: .
+      dockerfile: api-gateway/Dockerfile
+    image: api-gateway:local
+    ports:
+      - "8081:8081"
+    environment:
+      SPRING_APPLICATION_NAME: api-gateway
+      SERVER_PORT: 8081
+      MANAGEMENT_SERVER_PORT: 8081
+      EUREKA_DEFAULT_ZONE: http://eureka-server:8761/eureka   # ← changed
+    depends_on:
+      eureka-server:
+        condition: service_healthy
+      balance-service:
+        condition: service_healthy
+      ledger-service:
+        condition: service_healthy
+      plaid-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8081/actuator/health"]
       interval: 5s
       timeout: 3s
       retries: 30

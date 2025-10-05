@@ -1,8 +1,8 @@
 {
   "info": {
-    "name": "Balance Predictor",
-    "_postman_id": "b74a6d3a-3e64-4d2f-9c9b-collection-local",
-    "description": "Postman collection for Balance Predictor microservices (Eureka, Balance, Ledger, Plaid).",
+    "name": "Balance Predictor (via API Gateway)",
+    "_postman_id": "b74a6d3a-3e64-4d2f-9c9b-collection-gateway",
+    "description": "Postman collection for Balance Predictor routed through Spring Cloud Gateway. Includes Eureka health and direct service checks through the gateway discovery locator.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "item": [
@@ -11,75 +11,48 @@
       "item": [
         {
           "name": "Eureka health",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": "{{eureka_base}}/actuator/health"
-          },
+          "request": { "method": "GET", "header": [], "url": "{{eureka_base}}/actuator/health" },
           "response": []
         },
         {
-          "name": "Balance health",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": "{{balance_base}}/actuator/health"
-          },
+          "name": "Gateway health",
+          "request": { "method": "GET", "header": [], "url": "{{gateway_base}}/actuator/health" },
           "response": []
         },
         {
-          "name": "Ledger health",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": "{{ledger_base}}/actuator/health"
-          },
+          "name": "Balance health (via gateway discovery)",
+          "request": { "method": "GET", "header": [], "url": "{{gateway_base}}/balance-service/actuator/health" },
           "response": []
         },
         {
-          "name": "Plaid health",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": "{{plaid_base}}/actuator/health"
-          },
+          "name": "Ledger health (via gateway discovery)",
+          "request": { "method": "GET", "header": [], "url": "{{gateway_base}}/ledger-service/actuator/health" },
+          "response": []
+        },
+        {
+          "name": "Plaid health (via gateway discovery)",
+          "request": { "method": "GET", "header": [], "url": "{{gateway_base}}/plaid-service/actuator/health" },
           "response": []
         }
       ]
     },
     {
-      "name": "Ledger Service",
+      "name": "Ledger Service (via gateway)",
       "item": [
         {
           "name": "Add events (POST)",
           "request": {
             "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
+            "header": [ { "key": "Content-Type", "value": "application/json" } ],
             "url": {
-              "raw": "{{ledger_base}}/api/ledger/events?userId={{userId}}",
-              "host": [
-                "{{ledger_base}}"
-              ],
-              "path": [
-                "api",
-                "ledger",
-                "events"
-              ],
-              "query": [
-                {
-                  "key": "userId",
-                  "value": "{{userId}}"
-                }
-              ]
+              "raw": "{{gateway_base}}/api/ledger/events?userId={{userId}}",
+              "host": [ "{{gateway_base}}" ],
+              "path": [ "api", "ledger", "events" ],
+              "query": [ { "key": "userId", "value": "{{userId}}" } ]
             },
             "body": {
               "mode": "raw",
-              "raw": "[\n  {\n    \"date\": \"2025-09-29\",\n    \"amount\": -50.0,\n    \"description\": \"Test debit\"\n  },\n  {\n    \"date\": \"2025-09-30\",\n    \"amount\": 200.0,\n    \"description\": \"Paycheck\"\n  }\n]"
+              "raw": "[\n  {\n    \"date\": \"2025-10-04\",\n    \"amount\": -50.0,\n    \"description\": \"Test debit\"\n  },\n  {\n    \"date\": \"2025-10-04\",\n    \"amount\": 200.0,\n    \"description\": \"Paycheck\"\n  }\n]"
             },
             "description": "Negative = debit (money out). Positive = credit (money in)."
           },
@@ -87,64 +60,43 @@
         },
         {
           "name": "Get events (GET)",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": "{{ledger_base}}/api/ledger/events?userId={{userId}}"
-          },
+          "request": { "method": "GET", "header": [], "url": "{{gateway_base}}/api/ledger/events?userId={{userId}}" },
           "response": []
         }
       ]
     },
     {
-      "name": "Plaid Service (mock)",
+      "name": "Plaid Service (mock, via gateway)",
       "item": [
         {
           "name": "Get current balance",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": "{{plaid_base}}/api/plaid/balance?userId={{userId}}"
-          },
+          "request": { "method": "GET", "header": [], "url": "{{gateway_base}}/api/plaid/balance?userId={{userId}}" },
           "response": []
         }
       ]
     },
     {
-      "name": "Balance Service (aggregated)",
+      "name": "Balance Service (aggregated, via gateway)",
       "item": [
         {
           "name": "Get projected balance",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": "{{balance_base}}/api/balance/running?userId={{userId}}"
-          },
+          "request": { "method": "GET", "header": [], "url": "{{gateway_base}}/api/balance/running?userId={{userId}}" },
           "response": []
         }
+      ]
+    },
+    {
+      "name": "Direct Services (optional)",
+      "item": [
+        { "name": "Balance direct health", "request": { "method": "GET", "header": [], "url": "http://localhost:8080/actuator/health" }, "response": [] },
+        { "name": "Ledger direct health", "request": { "method": "GET", "header": [], "url": "http://localhost:8082/actuator/health" }, "response": [] },
+        { "name": "Plaid direct health", "request": { "method": "GET", "header": [], "url": "http://localhost:8083/actuator/health" }, "response": [] }
       ]
     }
   ],
   "variable": [
-    {
-      "key": "userId",
-      "value": "1"
-    },
-    {
-      "key": "eureka_base",
-      "value": "http://localhost:8761"
-    },
-    {
-      "key": "balance_base",
-      "value": "http://localhost:8080"
-    },
-    {
-      "key": "ledger_base",
-      "value": "http://localhost:8082"
-    },
-    {
-      "key": "plaid_base",
-      "value": "http://localhost:8083"
-    }
+    { "key": "userId", "value": "1" },
+    { "key": "eureka_base", "value": "http://localhost:8761" },
+    { "key": "gateway_base", "value": "http://localhost:8081" }
   ]
 }
