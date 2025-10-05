@@ -2,195 +2,270 @@
 
 [![CI](https://github.com/pa-mi-su/balance-predictor/actions/workflows/ci.yml/badge.svg)](https://github.com/pa-mi-su/balance-predictor/actions/workflows/ci.yml)
 [![Docker](https://img.shields.io/badge/docker-ready-blue)]()
-[![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
-[![Java](https://img.shields.io/badge/java-17-orange)]()
-[![Spring Boot](https://img.shields.io/badge/springboot-3.3.3-brightgreen)]()
-[![Spring Cloud](https://img.shields.io/badge/springcloud-2023.0.3-blue)]()
+[![License:
+MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+[![Java](https://img.shields.io/badge/java-17-orange)]() [![Spring
+Boot](https://img.shields.io/badge/springboot-3.3.3-brightgreen)]()
+[![Spring
+Cloud](https://img.shields.io/badge/springcloud-2023.0.3-blue)]()
 
-A **microservices-based balance forecasting system** built with **Java 17, Spring Boot, Spring Cloud (Eureka), Docker, and Docker Compose**.  
-It demonstrates real-world patterns like **service discovery**, **API aggregation**, and **containerized deployment**.
+A **microservices-based balance forecasting system** built with **Java
+17, Spring Boot, Spring Cloud (Eureka), Docker, PostgreSQL, and
+Flyway**.\
+It demonstrates real-world enterprise patterns like **service
+discovery**, **API aggregation**, **database-backed persistence**, and
+**containerized deployment**.
 
----
+------------------------------------------------------------------------
 
 ## 🚀 Features
-- **API Gateway (NEW)** → Central entry point for all services using **Spring Cloud Gateway**, routing requests to backend services through **Eureka Discovery**.
-- **Balance Service** → Aggregates data from Ledger & Plaid services and calculates projected balances.
-- **Ledger Service** → Stores and returns user debit/credit events.
-- **Plaid Service (Mock)** → Simulates a bank API returning current balance information.
-- **Eureka Server** → Service registry for discovery & load balancing.
-- **Swagger UI** → Interactive API documentation for all services.
-- **Docker Compose Setup** → Run the entire system with a single command.
-- **CI/CD** → GitHub Actions builds & tests modules and uploads artifacts.
-- **Postman Collection** → One-click API testing for all endpoints.
 
----
+-   **API Gateway (NEW)** → Central entry point for all services using
+    **Spring Cloud Gateway**, routing through **Eureka Discovery**.
+-   **Balance Service** → Aggregates transactions and balances from
+    Ledger & Plaid to compute projected balances.
+-   **Ledger Service (DB Layer Revamp)** →
+    -   Fully migrated from in-memory storage to **PostgreSQL 16**.\
+    -   Uses **Spring Data JPA + Flyway migrations** for schema
+        management.\
+    -   Persists all debit/credit events in a durable relational store.
+-   **Plaid Service (Mock)** → Simulated external bank API providing
+    mock account balance data.
+-   **Eureka Server** → Service registry and discovery hub.
+-   **Swagger UI** → Interactive documentation for each service.
+-   **Docker Compose** → One-command startup of the entire platform.
+-   **Postman Collection (Gateway Edition)** → One-click testing of all
+    API endpoints.
+-   **CI/CD (GitHub Actions)** → Builds, tests, and publishes
+    multi-service Docker artifacts.
+
+------------------------------------------------------------------------
+
+## 🧩 DB Layer Upgrade (October 2025)
+
+The **Ledger Service** now has a full persistence layer and migration
+support.
+
+### ✅ Highlights
+
+-   Added **PostgreSQL 16 (bpdb)** container in Docker Compose.
+
+-   Added **Flyway migrations** (`V1__create_pending_events.sql`) for
+    schema bootstrap.
+
+-   Introduced **`PendingEvent` JPA entity** and
+    **`PendingEventRepository`**.
+
+-   Updated **LedgerService** and **LedgerController** to perform real
+    DB reads/writes.
+
+-   Removed all legacy **in-memory model classes**.
+
+-   Added healthchecks for `bp-postgres` and service dependency
+    ordering.
+
+-   Updated Maven dependencies to include:
+
+    ``` xml
+    <dependency>
+      <groupId>org.postgresql</groupId>
+      <artifactId>postgresql</artifactId>
+      <scope>runtime</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.flywaydb</groupId>
+      <artifactId>flyway-core</artifactId>
+    </dependency>
+    ```
+
+-   Verified schema migration with Flyway at container startup:
+
+        Database: jdbc:postgresql://postgres:5432/bpdb (PostgreSQL 16.10)
+        Successfully applied 1 migration to schema "public", now at version v1
+
+### 🧠 DB Entity Example
+
+``` java
+@Entity
+@Table(name = "pending_events")
+public class PendingEvent {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    private Long userId;
+    private LocalDate date;
+    private BigDecimal amount;
+    private String description;
+}
+```
+
+------------------------------------------------------------------------
 
 ## 🛠️ Tech Stack
-- **Java 17**
-- **Spring Boot 3.3.3**
-- **Spring Cloud 2023.0.3 (Eureka Server + Client, LoadBalancer, Gateway)**
-- **Spring WebFlux (WebClient)** with `@LoadBalanced` for service discovery
-- **Docker & Docker Compose** for containerization
-- **Springdoc OpenAPI** for Swagger UI
-- **GitHub Actions** for CI/CD pipelines
-- **Postman** for API testing
 
----
+-   **Java 17**
+-   **Spring Boot 3.3.3**
+-   **Spring Cloud 2023.0.3**
+-   **PostgreSQL 16**
+-   **Spring Data JPA**
+-   **Flyway 10**
+-   **Springdoc OpenAPI**
+-   **Docker / Docker Compose**
+-   **GitHub Actions**
+-   **Postman**
+
+------------------------------------------------------------------------
 
 ## 📦 Getting Started
 
-### 1. Clone the repo
-```bash
+### 1. Clone & Build
+
+``` bash
 git clone git@github.com:pa-mi-su/balance-predictor.git
 cd balance-predictor
 ```
 
-### 2. Build & Run with Docker Compose
-```bash
+### 2. Run the Full Stack
+
+``` bash
 docker compose down -v --remove-orphans
 docker compose build --no-cache
 docker compose up -d
 ```
 
-### 3. Verify services are healthy
-```bash
+### 3. Verify Services
+
+``` bash
 docker compose ps
-curl -s http://localhost:8761/actuator/health   # Eureka Server
-curl -s http://localhost:8080/actuator/health   # Balance Service
-curl -s http://localhost:8082/actuator/health   # Ledger Service
-curl -s http://localhost:8083/actuator/health   # Plaid Service
-curl -s http://localhost:8081/actuator/health   # API Gateway
+curl -s http://localhost:8761/actuator/health   # Eureka
+curl -s http://localhost:8082/actuator/health   # Ledger
+curl -s http://localhost:8080/actuator/health   # Balance
+curl -s http://localhost:8083/actuator/health   # Plaid
+curl -s http://localhost:8081/actuator/health   # Gateway
 ```
 
----
+------------------------------------------------------------------------
+
+## 🗄️ Database Configuration
+
+The database service (`bp-postgres`) is included in
+`docker-compose.yml`.
+
+  ---------------------------------------------------------------------------------------------------
+  Env Var                   Description                      Value
+  ------------------------- -------------------------------- ----------------------------------------
+  `POSTGRES_DB`             Database name                    `bpdb`
+
+  `POSTGRES_USER`           Username                         `bpuser`
+
+  `POSTGRES_PASSWORD`       Password                         `bppass`
+
+  `SPRING_DATASOURCE_URL`   JDBC URL                         `jdbc:postgresql://postgres:5432/bpdb`
+  ---------------------------------------------------------------------------------------------------
+
+------------------------------------------------------------------------
 
 ## 🌉 API Gateway Overview
 
-The **API Gateway** (Spring Cloud Gateway) runs on **port 8081** and provides a unified access layer to all backend services.  
-It uses **Eureka service discovery** to dynamically route traffic without hardcoded URLs.
+  Route Prefix        Target Service           Description
+  ------------------- ------------------------ ------------------------
+  `/api/balance/**`   `lb://balance-service`   Aggregated projections
+  `/api/ledger/**`    `lb://ledger-service`    DB-backed transactions
+  `/api/plaid/**`     `lb://plaid-service`     Mock Plaid endpoints
 
-### Default Routes
+Each route uses `StripPrefix=1` for clean forwarding.\
+Runs on **port 8081**.
 
-| Service | Gateway Route | Target Service (via Eureka) |
-|----------|----------------|-----------------------------|
-| Balance Service | `/api/balance/**` | `lb://balance-service` |
-| Ledger Service  | `/api/ledger/**`  | `lb://ledger-service`  |
-| Plaid Service   | `/api/plaid/**`   | `lb://plaid-service`   |
+------------------------------------------------------------------------
 
-Each route applies a `StripPrefix=1` filter, so `/api/balance/foo` maps to `/foo` on the target service.
+## 💡 Example End-to-End Flow
 
----
-
-### Example API Gateway Requests
-
-#### ✅ Health Checks
-```bash
-# Gateway itself
-curl -s http://localhost:8081/actuator/health
-
-# Via Gateway → Plaid
-curl -s http://localhost:8081/plaid-service/actuator/health
-
-# Via Gateway → Ledger
-curl -s http://localhost:8081/ledger-service/actuator/health
-
-# Via Gateway → Balance
-curl -s http://localhost:8081/balance-service/actuator/health
-```
-
-#### ✅ End-to-End Flow
-```bash
-# Get mock Plaid balance
+``` bash
+# 1. Get Plaid mock balance
 curl -s "http://localhost:8081/api/plaid/balance?userId=1"
 
-# Add ledger events (POST)
-curl -s -H "Content-Type: application/json"   -d '[{"date":"2025-10-04","amount":-50.0,"description":"Test debit"}]'   "http://localhost:8081/api/ledger/events?userId=1"
+# 2. Add Ledger events (DB write)
+curl -s -H "Content-Type: application/json"   -d '[{"date":"2025-10-05","amount":-60.0,"description":"Dinner"},{"date":"2025-10-06","amount":500.0,"description":"Paycheck"}]'   "http://localhost:8081/api/ledger/events?userId=1"
 
-# Get projected balance
+# 3. Fetch persisted Ledger events (DB read)
+curl -s "http://localhost:8081/api/ledger/events?userId=1"
+
+# 4. Compute projected balance
 curl -s "http://localhost:8081/api/balance/running?userId=1"
 ```
 
----
+------------------------------------------------------------------------
 
-## 📖 API Usage (Direct Services)
+## 📊 Postman Collection
 
-> You can still hit services directly on their own ports if needed.
+File: `postman/BalancePredictor-Gateway.postman_collection.json`
 
-### ✅ Add Ledger Events
-```bash
-curl -s -H "Content-Type: application/json"   -d '[{"date":"2025-09-29","amount":-50.00,"description":"Test debit"}]'   "http://localhost:8082/api/ledger/events?userId=1"
-```
+Includes one-click: - Health checks - Ledger DB CRUD tests - Projected
+balance aggregation - End-to-end flow (Plaid → Ledger → Balance)
 
-### ✅ Get Current Balance (Plaid Mock)
-```bash
-curl -s "http://localhost:8083/api/plaid/balance?userId=1"
-```
+Import into Postman and run the "End-to-End Flow" folder to verify full
+system behavior.
 
-### ✅ Get Projected Balance (Aggregated)
-```bash
-curl -s "http://localhost:8080/api/balance/running?userId=1"
-```
-
----
+------------------------------------------------------------------------
 
 ## 📚 Swagger UIs
-- Balance → [http://localhost:8080/swagger-ui.html](http://localhost:8080/swagger-ui.html)  
-- Ledger → [http://localhost:8082/swagger-ui.html](http://localhost:8082/swagger-ui.html)  
-- Plaid → [http://localhost:8083/swagger-ui.html](http://localhost:8083/swagger-ui.html)  
-- Eureka → [http://localhost:8761](http://localhost:8761)  
 
----
+  -----------------------------------------------------------------------------------------
+  Service                                         URL
+  ----------------------------------------------- -----------------------------------------
+  Balance                                         <http://localhost:8080/swagger-ui.html>
 
-## 🧪 Example Workflow
-1. Add some debit/credit events in Ledger Service.  
-2. Check current balance from Plaid Service (mock).  
-3. Get aggregated projected balance from Balance Service.  
-4. Optionally, route all requests through the API Gateway on `:8081`.  
-5. View service registration in the **Eureka Dashboard** at `http://localhost:8761`.
+  Ledger                                          <http://localhost:8082/swagger-ui.html>
 
----
+  Plaid                                           <http://localhost:8083/swagger-ui.html>
 
-## 🔗 Networking
-All services are attached to the custom Docker network **`bpnet`**.  
-Services resolve each other by **logical service ID** via **Eureka** (`ledger-service`, `plaid-service`, `balance-service`, `api-gateway`).
+  Eureka                                          <http://localhost:8761>
+  -----------------------------------------------------------------------------------------
 
----
+------------------------------------------------------------------------
 
-## 🧰 Postman Collection (Gateway Edition)
-We provide an updated **Postman collection** configured for gateway-based routing.
+## 🧱 Architecture Overview
 
-### Import Instructions:
-1. Import `postman/BalancePredictor-Gateway.postman_collection.json` into Postman.  
-2. Verify environment variables:
-   - `gateway_base = http://localhost:8081`
-   - `eureka_base = http://localhost:8761`
-   - `userId = 1`
-3. Run the **“Health”** and **“Balance Service (via gateway)”** requests to confirm full routing.
+              ┌────────────────┐
+              │  API Gateway   │  (8081)
+              └──────┬─────────┘
+                     │
+         ┌───────────┼──────────────┐
+         │           │              │
+    ┌────┴────┐ ┌────┴────┐ ┌──────┴────┐
+    │ Balance │ │ Ledger  │ │  Plaid     │
+    │ Service │ │ Service │ │  Service   │
+    │ (8080)  │ │ (8082)  │ │ (8083)    │
+    └─────────┘ └─────────┘ └───────────┘
+           │             │
+           └─────────────┘
+               PostgreSQL (bpdb)
 
----
+------------------------------------------------------------------------
 
 ## 🤖 CI/CD
-GitHub Actions workflow:
-- Runs `mvn clean verify` for PRs into `dev`, `uat`, `main`, `prod`.  
-- Runs `mvn package -DskipTests` on pushes/tags for artifact builds.  
-- Uploads `.jar` artifacts for each service for deployment.  
 
----
+GitHub Actions: - Lint, compile, and test on PRs. - Build `.jar`
+artifacts for all services. - Optional Docker image publishing workflow.
 
-## 📂 Project Structure
-```
-balance-predictor/
-├── api-gateway/         # Spring Cloud Gateway service
-├── balance-service/     # Aggregator service
-├── ledger-service/      # Transaction storage
-├── plaid-service/       # Mock bank API
-├── eureka-server/       # Service discovery
-├── docker-compose.yml   # Multi-service orchestration
-├── pom.xml              # Root aggregator POM
-└── README.md
-```
+------------------------------------------------------------------------
 
----
+## 📂 Project Layout
+
+    balance-predictor/
+    ├── api-gateway/         # Spring Cloud Gateway
+    ├── balance-service/     # Aggregates ledger + plaid
+    ├── ledger-service/      # DB-backed ledger (JPA + Flyway)
+    │   └── src/main/resources/db/migration/V1__create_pending_events.sql
+    ├── plaid-service/       # Mock bank API
+    ├── eureka-server/       # Discovery service
+    ├── docker-compose.yml   # Full-stack orchestration
+    ├── postman/             # Postman test suite
+    └── README.md
+
+------------------------------------------------------------------------
 
 ## 📜 License
-This project is licensed under the MIT License.
+
+This project is licensed under the **MIT License**.
