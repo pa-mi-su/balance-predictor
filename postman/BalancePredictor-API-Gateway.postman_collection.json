@@ -1,48 +1,73 @@
 {
   "info": {
-    "name": "Balance Predictor \u2013 API Gateway",
+    "name": "Balance Predictor – API Gateway (DB Layer Ready)",
     "_postman_id": "b74a6d3a-3e64-4d2f-9c9b-gateway",
-    "description": "End-to-end Postman collection for testing Balance Predictor through the API Gateway (Spring Cloud Gateway + Eureka).",
+    "description": "Full end-to-end Postman collection for testing Balance Predictor (Spring Cloud Gateway + Eureka + PostgreSQL). Validates DB persistence, service registration, and projected balance flow.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "item": [
     {
       "name": "Health Checks",
       "item": [
+        { "name": "Eureka health", "request": { "method": "GET", "url": "{{eureka_base}}/actuator/health" } },
+        { "name": "Gateway health", "request": { "method": "GET", "url": "{{gateway_base}}/actuator/health" } },
+        { "name": "Balance direct health", "request": { "method": "GET", "url": "http://localhost:8080/actuator/health" } },
+        { "name": "Ledger direct health", "request": { "method": "GET", "url": "http://localhost:8082/actuator/health" } },
+        { "name": "Plaid direct health", "request": { "method": "GET", "url": "http://localhost:8083/actuator/health" } }
+      ]
+    },
+    {
+      "name": "Ledger Service (via Gateway)",
+      "item": [
         {
-          "name": "Eureka health",
+          "name": "Add events (DB write)",
           "request": {
-            "method": "GET",
-            "url": "{{eureka_base}}/actuator/health"
-          }
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{gateway_base}}/api/ledger/events?userId={{userId}}",
+            "body": {
+              "mode": "raw",
+              "raw": "[\n  {\"date\":\"2025-10-05\",\"amount\":-50.00,\"description\":\"Groceries\"},\n  {\"date\":\"2025-10-05\",\"amount\":300.00,\"description\":\"Deposit\"}\n]"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "// Ensure 2 events inserted",
+                  "pm.test('Inserted 2 events', () => {",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.length).to.eql(2);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
         },
         {
-          "name": "Gateway health",
+          "name": "Get events (DB read)",
           "request": {
             "method": "GET",
-            "url": "{{gateway_base}}/actuator/health"
-          }
-        },
-        {
-          "name": "Balance direct health",
-          "request": {
-            "method": "GET",
-            "url": "http://localhost:8080/actuator/health"
-          }
-        },
-        {
-          "name": "Ledger direct health",
-          "request": {
-            "method": "GET",
-            "url": "http://localhost:8082/actuator/health"
-          }
-        },
-        {
-          "name": "Plaid direct health",
-          "request": {
-            "method": "GET",
-            "url": "http://localhost:8083/actuator/health"
-          }
+            "url": "{{gateway_base}}/api/ledger/events?userId={{userId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "// Verify events fetched successfully",
+                  "pm.test('Events retrieved', () => {",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json).to.be.an('array');",
+                  "  pm.expect(json.length).to.be.greaterThan(0);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
         }
       ]
     },
@@ -59,35 +84,6 @@
       ]
     },
     {
-      "name": "Ledger Service (via Gateway)",
-      "item": [
-        {
-          "name": "Add events",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "url": "{{gateway_base}}/api/ledger/events?userId={{userId}}",
-            "body": {
-              "mode": "raw",
-              "raw": "[\n  {\"date\":\"2025-10-04\",\"amount\":-50.0,\"description\":\"Test debit\"},\n  {\"date\":\"2025-10-04\",\"amount\":200.0,\"description\":\"Paycheck\"}\n]"
-            }
-          }
-        },
-        {
-          "name": "Get events",
-          "request": {
-            "method": "GET",
-            "url": "{{gateway_base}}/api/ledger/events?userId={{userId}}"
-          }
-        }
-      ]
-    },
-    {
       "name": "Balance Service (via Gateway)",
       "item": [
         {
@@ -95,66 +91,58 @@
           "request": {
             "method": "GET",
             "url": "{{gateway_base}}/api/balance/running?userId={{userId}}"
-          }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "// Ensure projected balance value exists",
+                  "pm.test('Projected balance calculated', () => {",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json).to.have.property('projectedBalance');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
         }
       ]
     },
     {
-      "name": "End-to-End Flow",
+      "name": "End-to-End Flow (One-Click Run)",
       "item": [
         {
-          "name": "Step 1 - Check current balance (Plaid)",
-          "request": {
-            "method": "GET",
-            "url": "{{gateway_base}}/api/plaid/balance?userId={{userId}}"
-          }
+          "name": "Step 1 – Check current balance (Plaid)",
+          "request": { "method": "GET", "url": "{{gateway_base}}/api/plaid/balance?userId={{userId}}" }
         },
         {
-          "name": "Step 2 - Add Ledger events",
+          "name": "Step 2 – Add Ledger events",
           "request": {
             "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
             "url": "{{gateway_base}}/api/ledger/events?userId={{userId}}",
             "body": {
               "mode": "raw",
-              "raw": "[\n  {\"date\":\"2025-10-04\",\"amount\":-50.0,\"description\":\"Grocery\"},\n  {\"date\":\"2025-10-05\",\"amount\":300.0,\"description\":\"Deposit\"}\n]"
+              "raw": "[\n  {\"date\":\"2025-10-05\",\"amount\":-60.0,\"description\":\"Dinner\"},\n  {\"date\":\"2025-10-06\",\"amount\":500.0,\"description\":\"Paycheck\"}\n]"
             }
           }
         },
         {
-          "name": "Step 3 - Get all events",
-          "request": {
-            "method": "GET",
-            "url": "{{gateway_base}}/api/ledger/events?userId={{userId}}"
-          }
+          "name": "Step 3 – Verify events persisted",
+          "request": { "method": "GET", "url": "{{gateway_base}}/api/ledger/events?userId={{userId}}" }
         },
         {
-          "name": "Step 4 - Get projected balance",
-          "request": {
-            "method": "GET",
-            "url": "{{gateway_base}}/api/balance/running?userId={{userId}}"
-          }
+          "name": "Step 4 – Compute projected balance",
+          "request": { "method": "GET", "url": "{{gateway_base}}/api/balance/running?userId={{userId}}" }
         }
       ]
     }
   ],
   "variable": [
-    {
-      "key": "gateway_base",
-      "value": "http://localhost:8081"
-    },
-    {
-      "key": "eureka_base",
-      "value": "http://localhost:8761"
-    },
-    {
-      "key": "userId",
-      "value": "1"
-    }
+    { "key": "gateway_base", "value": "http://localhost:8081" },
+    { "key": "eureka_base", "value": "http://localhost:8761" },
+    { "key": "userId", "value": "1" }
   ]
 }

@@ -1,4 +1,5 @@
 services:
+  # --- Service Discovery ---
   eureka-server:
     build:
       context: .
@@ -21,6 +22,26 @@ services:
       start_period: 15s
     restart: unless-stopped
 
+  # --- Database (new) ---
+  postgres:
+    image: postgres:16-alpine
+    container_name: bp-postgres
+    environment:
+      POSTGRES_DB: bpdb
+      POSTGRES_USER: bpuser
+      POSTGRES_PASSWORD: bppass
+    ports:
+      - "5432:5432" # optional for local tools
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U bpuser -d bpdb"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+  # --- Core Services ---
   ledger-service:
     build:
       context: .
@@ -32,9 +53,25 @@ services:
       SPRING_APPLICATION_NAME: ledger-service
       SERVER_PORT: 8082
       MANAGEMENT_SERVER_PORT: 8082
-      EUREKA_DEFAULT_ZONE: http://eureka-server:8761/eureka   # ← changed
+
+      # Eureka (your services read EUREKA_DEFAULT_ZONE in application.properties)
+      EUREKA_DEFAULT_ZONE: http://eureka-server:8761/eureka
+
+      # DB config (JPA + Flyway)
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/bpdb
+      SPRING_DATASOURCE_USERNAME: bpuser
+      SPRING_DATASOURCE_PASSWORD: bppass
+      SPRING_JPA_HIBERNATE_DDL_AUTO: validate
+      SPRING_JPA_SHOW_SQL: "false"
+      SPRING_JPA_PROPERTIES_HIBERNATE_DIALECT: org.hibernate.dialect.PostgreSQLDialect
+      SPRING_FLYWAY_ENABLED: "true"
+      SPRING_FLYWAY_URL: jdbc:postgresql://postgres:5432/bpdb
+      SPRING_FLYWAY_USER: bpuser
+      SPRING_FLYWAY_PASSWORD: bppass
     depends_on:
       eureka-server:
+        condition: service_healthy
+      postgres:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://localhost:8082/actuator/health"]
@@ -55,7 +92,7 @@ services:
       SPRING_APPLICATION_NAME: plaid-service
       SERVER_PORT: 8083
       MANAGEMENT_SERVER_PORT: 8083
-      EUREKA_DEFAULT_ZONE: http://eureka-server:8761/eureka   # ← changed
+      EUREKA_DEFAULT_ZONE: http://eureka-server:8761/eureka
     depends_on:
       eureka-server:
         condition: service_healthy
@@ -78,8 +115,8 @@ services:
       SPRING_APPLICATION_NAME: balance-service
       SERVER_PORT: 8080
       MANAGEMENT_SERVER_PORT: 8080
-      EUREKA_DEFAULT_ZONE: http://eureka-server:8761/eureka   # ← changed
-      # LEDGER/PLAID base URLs removed (Eureka used instead)
+      EUREKA_DEFAULT_ZONE: http://eureka-server:8761/eureka
+      # No LEDGER/PLAID base URLs — resolved via Eureka
     depends_on:
       eureka-server:
         condition: service_healthy
@@ -95,6 +132,7 @@ services:
       start_period: 20s
     restart: unless-stopped
 
+  # --- API Gateway ---
   api-gateway:
     build:
       context: .
@@ -106,7 +144,7 @@ services:
       SPRING_APPLICATION_NAME: api-gateway
       SERVER_PORT: 8081
       MANAGEMENT_SERVER_PORT: 8081
-      EUREKA_DEFAULT_ZONE: http://eureka-server:8761/eureka   # ← changed
+      EUREKA_DEFAULT_ZONE: http://eureka-server:8761/eureka
     depends_on:
       eureka-server:
         condition: service_healthy
@@ -127,3 +165,6 @@ services:
 networks:
   default:
     name: bpnet
+
+volumes:
+  pgdata:
