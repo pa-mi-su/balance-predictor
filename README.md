@@ -29,28 +29,6 @@ It demonstrates real-world enterprise patterns like **service discovery**, **API
 
 ---
 
-## 🧩 DB Layer Upgrade (October 2025)
-
-The **Ledger Service** now has a full persistence layer and migration support.
-
-### ✅ Highlights
-
-- Added **PostgreSQL 16 (bpdb)** container in Docker Compose  
-- Added **Flyway migrations** (`V1__create_pending_events.sql`) for schema bootstrap  
-- Introduced **`PendingEvent` JPA entity** and **`PendingEventRepository`**  
-- Updated **LedgerService** and **LedgerController** to perform real DB reads/writes  
-- Removed all legacy **in-memory model classes**  
-- Added health checks for `bp-postgres` and service dependency ordering  
-- Updated Maven dependencies to include PostgreSQL & Flyway  
-- Verified schema migration with Flyway at container startup:
-
-  ```
-  Database: jdbc:postgresql://postgres:5432/bpdb (PostgreSQL 16.10)
-  Successfully applied 1 migration to schema "public", now at version v1
-  ```
-
----
-
 ## 🧠 Idempotency Contract
 
 The **Ledger Service** ensures **idempotent inserts** of user events — meaning **the same event cannot be stored twice**, even if re-sent.
@@ -92,116 +70,54 @@ This guarantees that:
 
 ---
 
-## 🛠️ Tech Stack
+## 🧭 System Flows (What happens, where)
 
-- **Java 17**
-- **Spring Boot 3.3.3**
-- **Spring Cloud 2023.0.3**
-- **PostgreSQL 16**
-- **Spring Data JPA**
-- **Flyway 10**
-- **Springdoc OpenAPI**
-- **Docker / Docker Compose**
-- **GitHub Actions**
-- **Postman**
+### 0) Startup & Discovery
+1. **Eureka Server** starts (8761).  
+2. **Postgres** starts (health-checked).  
+3. **Ledger Service** (8082) starts → runs **Flyway** → registers with **Eureka** as `LEDGER-SERVICE`.  
+4. **Plaid Service** (8083) starts → registers as `PLAID-SERVICE` (mock).  
+5. **Balance Service** (8080) starts → registers as `BALANCE-SERVICE`.  
+6. **API Gateway** (8081) starts → registers as `API-GATEWAY` and enables discovery-based routing.
 
----
+### 1) Health Checks
+- **Direct:** `:8080/8082/8083/8761` `/actuator/health`.  
+- **Via Gateway:** `/balance-service/actuator/health`, `/ledger-service/actuator/health`, `/plaid-service/actuator/health` + gateway’s own `/actuator/health`.
 
-## 📦 Getting Started
+### 2) Add Events (write path)
+- **Call:** `POST /api/ledger/events?userId={id}` (gateway → ledger).  
+- **Ledger Service:**  
+  - App-level dedupe via repository `existsByUserIdAndDateAndAmountAndDescription`.  
+  - Persist via JPA to Postgres.  
+  - DB-level dedupe via unique index `(user_id, event_date, amount, description)`.  
+  - Return ordered events for the user.
 
-### 1. Clone & Build
+### 3) Get Events (read path)
+- **Call:** `GET /api/ledger/events?userId={id}` (gateway → ledger).  
+- **Ledger Service:** `findByUserIdOrderByDateAscIdAsc` → Postgres → returns events.
 
-```bash
-git clone git@github.com:pa-mi-su/balance-predictor.git
-cd balance-predictor
-```
+### 4) Projected Balance (aggregation)
+- **Call:** `GET /api/balance/running?userId={id}` (gateway → balance).  
+- **Balance Service:**  
+  - Calls **Plaid** for current balance.  
+  - Calls **Ledger** for events.  
+  - Computes projected balance and returns it.
 
-### 2. Run the Full Stack
+### 5) Eureka + Gateway routing
+- Gateway forwards to `lb://{service}` using Eureka registrations (no hardcoded host:port).  
+- If a backend is down/unavailable, gateway returns `5xx/503` until it’s `UP` again.
 
-```bash
-docker compose down -v --remove-orphans
-docker compose build --no-cache
-docker compose up -d
-```
+### 6) Persistence & Idempotency Guarantees
+- **Durability:** Events live in Postgres; container restarts do not lose data.  
+- **Idempotency:** Reposting the same `(userId, date, amount, description)` never duplicates a row (app guard + unique index).  
+- **Ordering:** Reads sorted by `(event_date ASC, id ASC)`.
 
-### 3. Verify Services
-
-```bash
-docker compose ps
-curl -s http://localhost:8761/actuator/health   # Eureka
-curl -s http://localhost:8082/actuator/health   # Ledger
-curl -s http://localhost:8080/actuator/health   # Balance
-curl -s http://localhost:8083/actuator/health   # Plaid
-curl -s http://localhost:8081/actuator/health   # Gateway
-```
-
----
-
-## 💡 Example End-to-End Flow
-
-```bash
-# 1. Get Plaid mock balance
-curl -s "http://localhost:8081/api/plaid/balance?userId=1"
-
-# 2. Add Ledger events (DB write)
-curl -s -H "Content-Type: application/json"   -d '[{"date":"2025-10-05","amount":-60.0,"description":"Dinner"},
-       {"date":"2025-10-06","amount":500.0,"description":"Paycheck"}]'   "http://localhost:8081/api/ledger/events?userId=1"
-
-# 3. Fetch persisted Ledger events (DB read)
-curl -s "http://localhost:8081/api/ledger/events?userId=1"
-
-# 4. Compute projected balance
-curl -s "http://localhost:8081/api/balance/running?userId=1"
-```
-
----
-
-## 📊 Postman Collection
-
-File: `postman/BalancePredictor-Gateway.postman_collection.json`
-
-Includes one-click tests for:
-- Health checks  
-- Ledger DB CRUD  
-- Projected balance aggregation  
-- End-to-end workflow (Plaid → Ledger → Balance)
-
----
-
-## 📚 Swagger UIs
-
-| Service | URL |
-|----------|-----|
-| Balance | [http://localhost:8080/swagger-ui.html](http://localhost:8080/swagger-ui.html) |
-| Ledger | [http://localhost:8082/swagger-ui.html](http://localhost:8082/swagger-ui.html) |
-| Plaid | [http://localhost:8083/swagger-ui.html](http://localhost:8083/swagger-ui.html) |
-| Eureka | [http://localhost:8761](http://localhost:8761) |
-
----
-
-## 🤖 CI/CD
-
-GitHub Actions:
-- Builds & tests all modules on PRs  
-- Packages Docker images and JARs on push  
-- Runs full Maven verify lifecycle  
-
----
-
-## 📂 Project Layout
-
-```
-balance-predictor/
-├── api-gateway/
-├── balance-service/
-├── ledger-service/
-│   └── src/main/resources/db/migration/V1__create_pending_events.sql
-├── plaid-service/
-├── eureka-server/
-├── docker-compose.yml
-├── postman/
-└── README.md
-```
+### 7) Service Responsibilities (at a glance)
+- **Eureka Server:** registry only.  
+- **API Gateway:** single entry point, routing, health.  
+- **Ledger Service:** owns event storage & listing (JPA + Flyway).  
+- **Plaid Service (mock):** supplies current balance.  
+- **Balance Service:** orchestrates Plaid + Ledger to compute projected balance.
 
 ---
 
