@@ -131,6 +131,52 @@ balance-predictor/
 └─ pom.xml                # Root BOM/parent (version alignment)
 ---
 
+## 💳 Plaid Sandbox Integration (October 2025)
+
+The **Plaid Service** now integrates with the **Plaid Sandbox API** instead of static mock data.  
+This enables real Plaid workflows including **account linking, token exchange, and live balance retrieval** — all within the sandbox environment.
+
+### ✅ What’s New
+
+- **Real Plaid Connectivity**
+  - Uses Plaid’s official sandbox endpoints (`https://sandbox.plaid.com`).
+  - Requires valid `PLAID_CLIENT_ID` and `PLAID_SECRET` from your Plaid Dashboard.
+  - Automatically registered in Eureka and accessible via the API Gateway.
+
+- **Endpoints**
+  | Method | Endpoint | Description |
+  |---------|-----------|-------------|
+  | `POST` | `/api/plaid/sandbox/public_token/create` | Generates a sandbox `public_token` (simulates linking a bank account). |
+  | `POST` | `/api/plaid/item/public_token/exchange` | Exchanges the `public_token` for a persistent `access_token`. |
+  | `GET`  | `/api/plaid/balance?userId={id}` | Fetches live sandbox balances using the stored `access_token`. |
+
+- **Environment Variables**
+  ```bash
+  PLAID_ENV=sandbox
+  PLAID_CLIENT_ID=your_client_id_here
+  PLAID_SECRET=your_secret_here
+  PLAID_WEBHOOK_URL=
+  ```
+
+- **Example Usage**
+  ```bash
+  # 1. Create a sandbox public token
+  curl -s -X POST "http://localhost:8081/api/plaid/sandbox/public_token/create"     -H "Content-Type: application/json"     -d '{"userId":1}'
+
+  # 2. Exchange it for an access token
+  curl -s -X POST "http://localhost:8081/api/plaid/item/public_token/exchange"     -H "Content-Type: application/json"     -d '{"userId":1,"publicToken":"public-sandbox-..."}'
+
+  # 3. Fetch live sandbox balances
+  curl -s "http://localhost:8081/api/plaid/balance?userId=1" | jq
+  ```
+
+- **Results**
+  - Returns Plaid’s full sandbox dataset, including:
+    - Plaid Checking / Savings / Credit / Mortgage / 401k accounts
+    - Realistic balances and transaction-ready data
+
+---
+
 ## 📜 License
 
 This project is licensed under the **MIT License**.
