@@ -93,6 +93,10 @@ services:
       SERVER_PORT: 8083
       MANAGEMENT_SERVER_PORT: 8083
       EUREKA_DEFAULT_ZONE: http://eureka-server:8761/eureka
+      PLAID_ENV: ${PLAID_ENV}
+      PLAID_CLIENT_ID: ${PLAID_CLIENT_ID}
+      PLAID_SECRET: ${PLAID_SECRET}
+      PLAID_WEBHOOK_URL: ${PLAID_WEBHOOK_URL}
     depends_on:
       eureka-server:
         condition: service_healthy

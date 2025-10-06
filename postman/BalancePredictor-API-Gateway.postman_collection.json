@@ -1,21 +1,108 @@
 {
   "info": {
-    "name": "Balance Predictor – API Gateway (DB Layer Ready)",
+    "name": "Balance Predictor – API Gateway (DB + Plaid)",
     "_postman_id": "b74a6d3a-3e64-4d2f-9c9b-gateway",
-    "description": "Full end-to-end Postman collection for testing Balance Predictor (Spring Cloud Gateway + Eureka + PostgreSQL). Validates DB persistence, service registration, and projected balance flow.",
+    "description": "E2E testing for Balance Predictor via Spring Cloud Gateway + Eureka + PostgreSQL + Plaid (sandbox). Includes health checks, Plaid sandbox link flow, ledger DB ops, and projected balance.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "item": [
+
     {
       "name": "Health Checks",
       "item": [
         { "name": "Eureka health", "request": { "method": "GET", "url": "{{eureka_base}}/actuator/health" } },
         { "name": "Gateway health", "request": { "method": "GET", "url": "{{gateway_base}}/actuator/health" } },
-        { "name": "Balance direct health", "request": { "method": "GET", "url": "http://localhost:8080/actuator/health" } },
-        { "name": "Ledger direct health", "request": { "method": "GET", "url": "http://localhost:8082/actuator/health" } },
-        { "name": "Plaid direct health", "request": { "method": "GET", "url": "http://localhost:8083/actuator/health" } }
+        { "name": "Balance (direct)", "request": { "method": "GET", "url": "http://localhost:8080/actuator/health" } },
+        { "name": "Ledger (direct)", "request": { "method": "GET", "url": "http://localhost:8082/actuator/health" } },
+        { "name": "Plaid (direct)", "request": { "method": "GET", "url": "http://localhost:8083/actuator/health" } },
+        { "name": "Balance via gateway discovery", "request": { "method": "GET", "url": "{{gateway_base}}/balance-service/actuator/health" } },
+        { "name": "Ledger via gateway discovery", "request": { "method": "GET", "url": "{{gateway_base}}/ledger-service/actuator/health" } },
+        { "name": "Plaid via gateway discovery", "request": { "method": "GET", "url": "{{gateway_base}}/plaid-service/actuator/health" } }
       ]
     },
+
+    {
+      "name": "Plaid Service (via Gateway)",
+      "item": [
+        {
+          "name": "Sandbox: Create public_token",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{gateway_base}}/api/plaid/sandbox/public_token/create",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": {{userId}}\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "pm.test('public_token present', () => {",
+                  "  pm.expect(json).to.have.property('public_token');",
+                  "});",
+                  "// Save for next step",
+                  "pm.environment.set('public_token', pm.response.json().public_token);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Exchange public_token → access_token",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{gateway_base}}/api/plaid/item/public_token/exchange",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": {{userId}},\n  \"publicToken\": \"{{public_token}}\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "pm.test('access_token present', () => pm.expect(json).to.have.property('access_token'));",
+                  "// Stash token so balance works after restarts (client-side var)",
+                  "pm.environment.set('access_token', json.access_token);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Plaid balances",
+          "request": {
+            "method": "GET",
+            "url": "{{gateway_base}}/api/plaid/balance?userId={{userId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "pm.test('accounts[] present', () => pm.expect(json.accounts).to.be.an('array').that.is.not.empty);"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+
     {
       "name": "Ledger Service (via Gateway)",
       "item": [
@@ -34,14 +121,16 @@
             {
               "listen": "test",
               "script": {
+                "type": "text/javascript",
                 "exec": [
-                  "// Ensure 2 events inserted",
-                  "pm.test('Inserted 2 events', () => {",
-                  "  const json = pm.response.json();",
-                  "  pm.expect(json.length).to.eql(2);",
-                  "});"
-                ],
-                "type": "text/javascript"
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "const arr = pm.response.json();",
+                  "pm.test('Response is an array', () => pm.expect(arr).to.be.an('array'));",
+                  "// Idempotent-friendly: just assert both descriptions exist in the returned list",
+                  "const descs = arr.map(x => x.description);",
+                  "pm.test('Contains Groceries', () => pm.expect(descs).to.include('Groceries'));",
+                  "pm.test('Contains Deposit', () => pm.expect(descs).to.include('Deposit'));"
+                ]
               }
             }
           ]
@@ -56,33 +145,19 @@
             {
               "listen": "test",
               "script": {
+                "type": "text/javascript",
                 "exec": [
-                  "// Verify events fetched successfully",
-                  "pm.test('Events retrieved', () => {",
-                  "  const json = pm.response.json();",
-                  "  pm.expect(json).to.be.an('array');",
-                  "  pm.expect(json.length).to.be.greaterThan(0);",
-                  "});"
-                ],
-                "type": "text/javascript"
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "const arr = pm.response.json();",
+                  "pm.test('Got events array', () => pm.expect(arr).to.be.an('array').that.is.not.empty);"
+                ]
               }
             }
           ]
         }
       ]
     },
-    {
-      "name": "Plaid Service (via Gateway)",
-      "item": [
-        {
-          "name": "Get current balance",
-          "request": {
-            "method": "GET",
-            "url": "{{gateway_base}}/api/plaid/balance?userId={{userId}}"
-          }
-        }
-      ]
-    },
+
     {
       "name": "Balance Service (via Gateway)",
       "item": [
@@ -96,29 +171,80 @@
             {
               "listen": "test",
               "script": {
+                "type": "text/javascript",
                 "exec": [
-                  "// Ensure projected balance value exists",
-                  "pm.test('Projected balance calculated', () => {",
-                  "  const json = pm.response.json();",
-                  "  pm.expect(json).to.have.property('projectedBalance');",
-                  "});"
-                ],
-                "type": "text/javascript"
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "pm.test('projectedBalance present', () => pm.expect(json).to.have.property('projectedBalance'));"
+                ]
               }
             }
           ]
         }
       ]
     },
+
     {
-      "name": "End-to-End Flow (One-Click Run)",
+      "name": "End-to-End Flow (One-Click)",
       "item": [
         {
-          "name": "Step 1 – Check current balance (Plaid)",
-          "request": { "method": "GET", "url": "{{gateway_base}}/api/plaid/balance?userId={{userId}}" }
+          "name": "Step 1 – Plaid: Create public_token",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{gateway_base}}/api/plaid/sandbox/public_token/create",
+            "body": { "mode": "raw", "raw": "{\n  \"userId\": {{userId}}\n}" }
+          },
+          "event": [{
+            "listen": "test",
+            "script": {
+              "type": "text/javascript",
+              "exec": [
+                "pm.test('200', () => pm.response.to.have.status(200));",
+                "const t = pm.response.json().public_token;",
+                "pm.environment.set('public_token', t);",
+                "pm.test('public_token set', () => pm.expect(t).to.be.a('string').and.not.empty);"
+              ]
+            }
+          }]
         },
         {
-          "name": "Step 2 – Add Ledger events",
+          "name": "Step 2 – Plaid: Exchange token",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{gateway_base}}/api/plaid/item/public_token/exchange",
+            "body": { "mode": "raw", "raw": "{\n  \"userId\": {{userId}},\n  \"publicToken\": \"{{public_token}}\"\n}" }
+          },
+          "event": [{
+            "listen": "test",
+            "script": {
+              "type": "text/javascript",
+              "exec": [
+                "pm.test('200', () => pm.response.to.have.status(200));",
+                "const a = pm.response.json().access_token;",
+                "pm.environment.set('access_token', a);",
+                "pm.test('access_token set', () => pm.expect(a).to.be.a('string').and.not.empty);"
+              ]
+            }
+          }]
+        },
+        {
+          "name": "Step 3 – Plaid: Get balances",
+          "request": { "method": "GET", "url": "{{gateway_base}}/api/plaid/balance?userId={{userId}}" },
+          "event": [{
+            "listen": "test",
+            "script": {
+              "type": "text/javascript",
+              "exec": [
+                "pm.test('200', () => pm.response.to.have.status(200));",
+                "pm.test('accounts[] present', () => pm.expect(pm.response.json().accounts).to.be.an('array').that.is.not.empty);"
+              ]
+            }
+          }]
+        },
+        {
+          "name": "Step 4 – Ledger: Add events",
           "request": {
             "method": "POST",
             "header": [{ "key": "Content-Type", "value": "application/json" }],
@@ -130,11 +256,11 @@
           }
         },
         {
-          "name": "Step 3 – Verify events persisted",
+          "name": "Step 5 – Ledger: Verify events",
           "request": { "method": "GET", "url": "{{gateway_base}}/api/ledger/events?userId={{userId}}" }
         },
         {
-          "name": "Step 4 – Compute projected balance",
+          "name": "Step 6 – Balance: Projected balance",
           "request": { "method": "GET", "url": "{{gateway_base}}/api/balance/running?userId={{userId}}" }
         }
       ]
@@ -143,6 +269,8 @@
   "variable": [
     { "key": "gateway_base", "value": "http://localhost:8081" },
     { "key": "eureka_base", "value": "http://localhost:8761" },
-    { "key": "userId", "value": "1" }
+    { "key": "userId", "value": "1" },
+    { "key": "public_token", "value": "" },
+    { "key": "access_token", "value": "" }
   ]
 }
