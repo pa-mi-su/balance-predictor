@@ -6,7 +6,6 @@
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "item": [
-
     {
       "name": "Health Checks",
       "item": [
@@ -20,7 +19,6 @@
         { "name": "Plaid via gateway discovery", "request": { "method": "GET", "url": "{{gateway_base}}/plaid-service/actuator/health" } }
       ]
     },
-
     {
       "name": "Plaid Service (via Gateway)",
       "item": [
@@ -30,79 +28,59 @@
             "method": "POST",
             "header": [{ "key": "Content-Type", "value": "application/json" }],
             "url": "{{gateway_base}}/api/plaid/sandbox/public_token/create",
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"userId\": {{userId}}\n}"
-            }
+            "body": { "mode": "raw", "raw": "{\n  \"userId\": {{userId}}\n}" }
           },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
-                  "const json = pm.response.json();",
-                  "pm.test('public_token present', () => {",
-                  "  pm.expect(json).to.have.property('public_token');",
-                  "});",
-                  "// Save for next step",
-                  "pm.environment.set('public_token', pm.response.json().public_token);"
-                ]
-              }
+          "event": [{
+            "listen": "test",
+            "script": {
+              "type": "text/javascript",
+              "exec": [
+                "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                "const json = pm.response.json();",
+                "pm.test('public_token present', () => pm.expect(json).to.have.property('public_token'));",
+                "pm.environment.set('public_token', json.public_token);"
+              ]
             }
-          ]
+          }]
         },
         {
-          "name": "Exchange public_token → access_token",
+          "name": "Exchange public_token → access_token (persists in DB)",
           "request": {
             "method": "POST",
             "header": [{ "key": "Content-Type", "value": "application/json" }],
             "url": "{{gateway_base}}/api/plaid/item/public_token/exchange",
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"userId\": {{userId}},\n  \"publicToken\": \"{{public_token}}\"\n}"
-            }
+            "body": { "mode": "raw", "raw": "{\n  \"userId\": {{userId}},\n  \"publicToken\": \"{{public_token}}\"\n}" }
           },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
-                  "const json = pm.response.json();",
-                  "pm.test('access_token present', () => pm.expect(json).to.have.property('access_token'));",
-                  "// Stash token so balance works after restarts (client-side var)",
-                  "pm.environment.set('access_token', json.access_token);"
-                ]
-              }
+          "event": [{
+            "listen": "test",
+            "script": {
+              "type": "text/javascript",
+              "exec": [
+                "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                "const json = pm.response.json();",
+                "pm.test('access_token present', () => pm.expect(json).to.have.property('access_token'));",
+                "pm.environment.set('access_token', json.access_token);"
+              ]
             }
-          ]
+          }]
         },
         {
-          "name": "Get Plaid balances",
-          "request": {
-            "method": "GET",
-            "url": "{{gateway_base}}/api/plaid/balance?userId={{userId}}"
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
-                  "const json = pm.response.json();",
-                  "pm.test('accounts[] present', () => pm.expect(json.accounts).to.be.an('array').that.is.not.empty);"
-                ]
-              }
+          "name": "Get Plaid balances (uses stored access_token in service)",
+          "request": { "method": "GET", "url": "{{gateway_base}}/api/plaid/balance?userId={{userId}}" },
+          "event": [{
+            "listen": "test",
+            "script": {
+              "type": "text/javascript",
+              "exec": [
+                "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                "const json = pm.response.json();",
+                "pm.test('accounts[] present', () => pm.expect(json.accounts).to.be.an('array').that.is.not.empty);"
+              ]
             }
-          ]
+          }]
         }
       ]
     },
-
     {
       "name": "Ledger Service (via Gateway)",
       "item": [
@@ -117,73 +95,58 @@
               "raw": "[\n  {\"date\":\"2025-10-05\",\"amount\":-50.00,\"description\":\"Groceries\"},\n  {\"date\":\"2025-10-05\",\"amount\":300.00,\"description\":\"Deposit\"}\n]"
             }
           },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
-                  "const arr = pm.response.json();",
-                  "pm.test('Response is an array', () => pm.expect(arr).to.be.an('array'));",
-                  "// Idempotent-friendly: just assert both descriptions exist in the returned list",
-                  "const descs = arr.map(x => x.description);",
-                  "pm.test('Contains Groceries', () => pm.expect(descs).to.include('Groceries'));",
-                  "pm.test('Contains Deposit', () => pm.expect(descs).to.include('Deposit'));"
-                ]
-              }
+          "event": [{
+            "listen": "test",
+            "script": {
+              "type": "text/javascript",
+              "exec": [
+                "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                "const arr = pm.response.json();",
+                "pm.test('Response is an array', () => pm.expect(arr).to.be.an('array'));",
+                "const descs = arr.map(x => x.description);",
+                "pm.test('Contains Groceries', () => pm.expect(descs).to.include('Groceries'));",
+                "pm.test('Contains Deposit', () => pm.expect(descs).to.include('Deposit'));"
+              ]
             }
-          ]
+          }]
         },
         {
           "name": "Get events (DB read)",
-          "request": {
-            "method": "GET",
-            "url": "{{gateway_base}}/api/ledger/events?userId={{userId}}"
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
-                  "const arr = pm.response.json();",
-                  "pm.test('Got events array', () => pm.expect(arr).to.be.an('array').that.is.not.empty);"
-                ]
-              }
+          "request": { "method": "GET", "url": "{{gateway_base}}/api/ledger/events?userId={{userId}}" },
+          "event": [{
+            "listen": "test",
+            "script": {
+              "type": "text/javascript",
+              "exec": [
+                "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                "const arr = pm.response.json();",
+                "pm.test('Got events array', () => pm.expect(arr).to.be.an('array').that.is.not.empty);"
+              ]
             }
-          ]
+          }]
         }
       ]
     },
-
     {
       "name": "Balance Service (via Gateway)",
       "item": [
         {
           "name": "Get projected balance",
-          "request": {
-            "method": "GET",
-            "url": "{{gateway_base}}/api/balance/running?userId={{userId}}"
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
-                  "const json = pm.response.json();",
-                  "pm.test('projectedBalance present', () => pm.expect(json).to.have.property('projectedBalance'));"
-                ]
-              }
+          "request": { "method": "GET", "url": "{{gateway_base}}/api/balance/running?userId={{userId}}" },
+          "event": [{
+            "listen": "test",
+            "script": {
+              "type": "text/javascript",
+              "exec": [
+                "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                "const json = pm.response.json();",
+                "pm.test('projectedBalance present', () => pm.expect(json).to.have.property('projectedBalance'));"
+              ]
             }
-          ]
+          }]
         }
       ]
     },
-
     {
       "name": "End-to-End Flow (One-Click)",
       "item": [
