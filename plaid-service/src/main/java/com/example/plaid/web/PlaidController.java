@@ -37,6 +37,7 @@ public class PlaidController {
   private static final ParameterizedTypeReference<Map<String, Object>> MAP_REF =
           new ParameterizedTypeReference<>() {};
 
+  /** Create a Link token (front-end usually uses this). */
   @PostMapping(path = "/link/token/create", produces = MediaType.APPLICATION_JSON_VALUE)
   public Mono<Map<String, Object>> createLinkToken(@RequestBody LinkTokenCreateRequest req) {
     Assert.notNull(req.userId(), "userId required");
@@ -68,7 +69,7 @@ public class PlaidController {
     var body = Map.of(
             "client_id", clientId,
             "secret", secret,
-            "institution_id", "ins_109508",              // Plaid sandbox “Chase”
+            "institution_id", "ins_109508",              // Plaid sandbox “Chase” / First Platypus Bank
             "initial_products", new String[]{"transactions"}
     );
 
@@ -80,7 +81,7 @@ public class PlaidController {
             .bodyToMono(MAP_REF);
   }
 
-  /** Exchange public_token -> access_token and stash it (temp in-memory). */
+  /** Exchange public_token -> access_token and persist it (access_token + item_id). */
   @PostMapping(path = "/item/public_token/exchange", produces = MediaType.APPLICATION_JSON_VALUE)
   public Mono<Map<String, Object>> exchangePublicToken(@RequestBody PublicTokenExchangeRequest req) {
     Assert.notNull(req.userId(), "userId required");
@@ -100,8 +101,10 @@ public class PlaidController {
             .bodyToMono(MAP_REF)
             .map(resp -> {
               var accessToken = (String) resp.get("access_token");
-              if (accessToken != null) {
-                tokenStore.put(req.userId(), accessToken);
+              var itemId      = (String) resp.get("item_id");
+              if (accessToken != null && itemId != null) {
+                // DB-backed store: upsert by userId
+                tokenStore.put(req.userId(), accessToken, itemId);
               }
               return resp;
             });
