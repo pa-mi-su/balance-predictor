@@ -28,34 +28,28 @@
 
 ---
 
-## 🧠 Idempotent Ledger Writes
+## 🧠 Why This Project
 
-Duplicate financial events can wreak havoc on projections.  
-**Ledger Service** guarantees **idempotency** both at the application and database level.
+Modern personal finance apps struggle with delayed balance updates and poor forecasting. **Balance Predictor** bridges that gap by:
+- Synchronizing live Plaid balances with user-recorded ledger events.
+- Calculating short-term projections to prevent overdrafts.
+- Demonstrating a full microservice pattern with service discovery, resilience, and observability baked in.
 
-```sql
-CREATE UNIQUE INDEX uq_pending_events_natural
-  ON pending_events(user_id, event_date, amount, description);
-```
-
-- **App Guard:** `existsByUserIdAndDateAndAmountAndDescription()` prevents duplicates before insert.  
-- **DB Constraint:** unique index ensures absolute integrity.  
-- **Result:** safe retries, durable writes, consistent projections.
+This project serves as a **portfolio-ready reference architecture** for cloud-native Java developers.
 
 ---
 
-## 🧭 System Overview
+## 🧭 Architecture Overview
 
-```
-balance-predictor/
-├─ eureka-server/          
-├─ api-gateway/            
-├─ ledger-service/         
-├─ plaid-service/          
-├─ balance-service/        
-├─ docker-compose.yml      
-├─ postman/                
-└─ pom.xml                 
+```mermaid
+graph TD;
+  A[Client / Postman] -->|HTTP| G(API Gateway);
+  G -->|Service Discovery| E(Eureka Server);
+  G -->|/api/ledger| L(Ledger Service);
+  G -->|/api/plaid| P(Plaid Service);
+  G -->|/api/balance| B(Balance Service);
+  L -->|JPA + Flyway| D[(Postgres Database)];
+  P -->|Plaid Sandbox API| X[(Plaid Sandbox)];
 ```
 
 ### ⚙️ Service Ports
@@ -79,9 +73,104 @@ docker compose up -d --build
 curl http://localhost:8081/actuator/health
 ```
 
+### Verify All Services
+
+```bash
+docker compose ps
+```
+Expected healthy state:
+```
+NAME                                STATUS
+api-gateway                         healthy
+ledger-service                      healthy
+plaid-service                       healthy
+balance-service                     healthy
+eureka-server                       healthy
+postgres                            healthy
+```
+
+### Test Routes
+```bash
+# Add a ledger event
+curl -fsS -X POST "http://localhost:8081/api/ledger/events?userId=1"   -H "Content-Type: application/json"   -d '[{"date":"2025-10-08","amount":-42.50,"description":"Sanity check"}]' | jq
+
+# Get all events
+curl -fsS http://localhost:8081/api/ledger/events?userId=1 | jq
+```
+
 ---
 
-## 🧑‍💻 Tech Stack
+## 🧮 Idempotent Ledger Writes
+
+Duplicate financial events can wreak havoc on projections.  
+**Ledger Service** guarantees **idempotency** both at the application and database level.
+
+```sql
+CREATE UNIQUE INDEX uq_pending_events_natural
+  ON pending_events(user_id, event_date, amount, description);
+```
+
+- **App Guard:** `existsByUserIdAndDateAndAmountAndDescription()` prevents duplicates before insert.  
+- **DB Constraint:** unique index ensures absolute integrity.  
+- **Result:** safe retries, durable writes, consistent projections.
+
+---
+
+## 🔧 Developer Notes
+
+### Recommended JVM Flags
+```bash
+JAVA_TOOL_OPTIONS="-XX:MaxRAMPercentage=75 -XX:+ExitOnOutOfMemoryError"
+```
+
+### Compose Dependencies
+Add `depends_on: condition: service_healthy` in your `docker-compose.yml` for predictable startup order:
+```
+ledger-service:
+  depends_on:
+    eureka-server:
+      condition: service_healthy
+    postgres:
+      condition: service_healthy
+```
+
+### Hibernate Optimization
+```
+spring.jpa.open-in-view=false
+```
+
+---
+
+## 📊 Observability
+
+| Tool | Description |
+|------|--------------|
+| **Spring Actuator** | `/actuator/health`, `/actuator/info`, `/actuator/gateway/routes` for discovery & health. |
+| **Micrometer / Prometheus** | Ready for metrics collection and dashboarding. |
+| **Resilience4j (Optional)** | Add for retries, circuit breaking, and fallback patterns. |
+
+---
+
+## 🛠️ Local Development Makefile
+
+```makefile
+up:
+	docker compose up -d --build
+
+down:
+	docker compose down
+
+nuke:
+	docker compose down -v
+	rm -rf target
+
+logs:
+	docker compose logs -f --tail=100
+```
+
+---
+
+## 👩‍💻 Tech Stack
 
 | Layer | Tech |
 |-------|------|
@@ -92,9 +181,17 @@ curl http://localhost:8081/actuator/health
 | Database | PostgreSQL 16 + Flyway |
 | Persistence | Spring Data JPA + HikariCP |
 | Containerization | Docker + Compose |
-| Testing | Postman + cURL |
+| Testing | Postman + cURL + Testcontainers (future) |
 | CI/CD | GitHub Actions |
 | Docs | Swagger UI + Markdown |
+
+---
+
+## 🔍 Next Steps
+- [ ] Add Testcontainers-based integration test for Ledger Service
+- [ ] Add Grafana/Prometheus docker service for observability
+- [ ] Add screenshot of Plaid Sandbox flow in README
+- [ ] Include architecture diagram badge at top
 
 ---
 
