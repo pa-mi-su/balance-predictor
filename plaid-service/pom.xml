@@ -11,15 +11,14 @@
     <relativePath>../pom.xml</relativePath>
   </parent>
 
-  <!-- Keep service coordinates -->
   <groupId>com.example</groupId>
   <artifactId>plaid-service</artifactId>
   <version>0.0.1-SNAPSHOT</version>
   <name>plaid-service</name>
-  <description>Mock Plaid service returning current balances</description>
+  <description>Plaid sandbox integration + token persistence</description>
 
   <dependencies>
-    <!-- MVC web + actuator -->
+    <!-- Web (Servlet/Tomcat) + Actuator -->
     <dependency>
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-web</artifactId>
@@ -29,7 +28,7 @@
       <artifactId>spring-boot-starter-actuator</artifactId>
     </dependency>
 
-    <!-- Discovery + load balancer -->
+    <!-- Eureka client + LoadBalancer -->
     <dependency>
       <groupId>org.springframework.cloud</groupId>
       <artifactId>spring-cloud-starter-netflix-eureka-client</artifactId>
@@ -39,11 +38,39 @@
       <artifactId>spring-cloud-starter-loadbalancer</artifactId>
     </dependency>
 
-    <!-- OpenAPI for Spring MVC -->
+    <!-- OpenAPI / Swagger -->
     <dependency>
       <groupId>org.springdoc</groupId>
       <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
       <version>2.6.0</version>
+    </dependency>
+
+    <!-- WebClient without switching the app to reactive server -->
+    <dependency>
+      <groupId>org.springframework</groupId>
+      <artifactId>spring-webflux</artifactId>
+    </dependency>
+
+    <!-- JPA + Postgres -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-data-jpa</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.postgresql</groupId>
+      <artifactId>postgresql</artifactId>
+      <scope>runtime</scope>
+    </dependency>
+
+    <dependency>
+      <groupId>org.flywaydb</groupId>
+      <artifactId>flyway-core</artifactId>
+      <version>10.16.0</version>
+    </dependency>
+    <dependency>
+      <groupId>org.flywaydb</groupId>
+      <artifactId>flyway-database-postgresql</artifactId>
+      <version>10.16.0</version>
     </dependency>
 
     <!-- Tests -->
