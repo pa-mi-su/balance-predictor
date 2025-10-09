@@ -1,17 +1,16 @@
+# ---- build stage ----
 FROM maven:3.9.6-eclipse-temurin-17 AS build
 WORKDIR /workspace
 
 COPY pom.xml ./pom.xml
-COPY balance-service/pom.xml balance-service/pom.xml
-COPY ledger-service/pom.xml  ledger-service/pom.xml
-COPY plaid-service/pom.xml   plaid-service/pom.xml
-COPY eureka-server/pom.xml   eureka-server/pom.xml
+COPY plaid-service/pom.xml plaid-service/pom.xml
 
-RUN mvn -q -B -U -DskipTests dependency:go-offline
+RUN mvn -q -B -U -f plaid-service/pom.xml -DskipTests dependency:go-offline
 
 COPY plaid-service/src plaid-service/src
-RUN mvn -q -B -DskipTests -pl plaid-service -am package
+RUN mvn -q -B -f plaid-service/pom.xml -DskipTests package
 
+# ---- run stage ----
 FROM eclipse-temurin:17-jre
 WORKDIR /app
 COPY --from=build /workspace/plaid-service/target/plaid-service-*.jar /app/app.jar

@@ -1,138 +1,200 @@
-# Balance Predictor
+# 🧩 Balance Predictor
 
-[![Build](https://img.shields.io/badge/build-passing-brightgreen)]()
+[![CI](https://github.com/pa-mi-su/balance-predictor/actions/workflows/ci.yml/badge.svg)](https://github.com/pa-mi-su/balance-predictor/actions/workflows/ci.yml)
 [![Docker](https://img.shields.io/badge/docker-ready-blue)]()
-[![License](https://img.shields.io/badge/license-MIT-green)]()
+[![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Java](https://img.shields.io/badge/java-17-orange)]()
 [![Spring Boot](https://img.shields.io/badge/springboot-3.3.3-brightgreen)]()
 [![Spring Cloud](https://img.shields.io/badge/springcloud-2023.0.3-blue)]()
 
-A **microservices-based balance forecasting system** built with **Java 17, Spring Boot, Spring Cloud (Eureka), Docker, and Docker Compose**.  
-It demonstrates real-world patterns like **service discovery**, **API aggregation**, and **containerized deployment**.
+> **Balance Predictor** is a **microservices-based financial forecasting system** that predicts future account balances by combining **Plaid banking data** with **user transaction history**.  
+> Built with **Java 17**, **Spring Boot**, **Spring Cloud Eureka**, **Docker**, and **PostgreSQL**, it models the architectural principles found in real-world enterprise platforms.
 
 ---
 
-## 🚀 Features
-- **Balance Service** → Aggregates data from Ledger & Plaid services and calculates projected balances.
-- **Ledger Service** → Stores and returns user debit/credit events.
-- **Plaid Service (Mock)** → Simulates a bank API returning current balance information.
-- **Eureka Server** → Service registry for discovery & load balancing.
-- **Swagger UI** → Interactive API documentation for all services.
-- **Docker Compose Setup** → Run the entire system with a single command.
-- **CI/CD** → GitHub Actions builds & tests modules and uploads artifacts.
-- **Postman Collection** → One-click API testing for all endpoints.
+## 🌟 Highlights
+
+| Capability | Description |
+|-------------|--------------|
+| 🧭 **Microservice Architecture** | Independent services (Ledger, Balance, Plaid, Gateway, Eureka) communicating through REST + Service Discovery. |
+| 🔗 **Plaid Sandbox Integration** | Live connection to Plaid’s Sandbox API for token creation, exchange, and balance retrieval. |
+| 🧮 **Balance Forecasting Engine** | Aggregates real account balances with ledger events to project future funds. |
+| 🧱 **Persistent Ledger** | Durable event storage in PostgreSQL 16 using **Spring Data JPA** and **Flyway** migrations. |
+| 🚪 **API Gateway** | Central entry point with **Spring Cloud Gateway** and Eureka-based load-balanced routing. |
+| ⚙️ **Docker-Compose Stack** | One-command startup for all containers (Eureka, Postgres, Ledger, Plaid, Balance, Gateway). |
+| 📘 **Swagger + Postman** | Auto-documented APIs and one-click end-to-end testing via a bundled Postman collection. |
+| 🔄 **Idempotent Writes** | Guaranteed safe re-submission of events via app- and DB-level deduplication. |
+| 🧰 **CI/CD Ready** | Automated builds and multi-service Docker image packaging with GitHub Actions. |
 
 ---
 
-## 🛠️ Tech Stack
-- **Java 17**
-- **Spring Boot 3.3.3**
-- **Spring Cloud 2023.0.3 (Eureka Server + Client, LoadBalancer)**
-- **Spring WebFlux (WebClient)** for async HTTP calls
-- **Docker & Docker Compose** for containerization
-- **Springdoc OpenAPI** for Swagger UI
-- **GitHub Actions** for CI/CD pipelines
-- **Postman** for API testing
+## 🧠 Why This Project
+
+Modern personal finance apps struggle with delayed balance updates and poor forecasting. **Balance Predictor** bridges that gap by:
+- Synchronizing live Plaid balances with user-recorded ledger events.
+- Calculating short-term projections to prevent overdrafts.
+- Demonstrating a full microservice pattern with service discovery, resilience, and observability baked in.
+
+This project serves as a **portfolio-ready reference architecture** for cloud-native Java developers.
 
 ---
 
-## 📦 Getting Started
+## 🧭 Architecture Overview
 
-### 1. Clone the repo
-```bash
-git clone git@github.com:pa-mi-su/balance-predictor.git
-cd balance-predictor
+```mermaid
+graph TD;
+  A[Client / Postman] -->|HTTP| G(API Gateway);
+  G -->|Service Discovery| E(Eureka Server);
+  G -->|/api/ledger| L(Ledger Service);
+  G -->|/api/plaid| P(Plaid Service);
+  G -->|/api/balance| B(Balance Service);
+  L -->|JPA + Flyway| D[(Postgres Database)];
+  P -->|Plaid Sandbox API| X[(Plaid Sandbox)];
 ```
 
-### 2. Build & Run with Docker Compose
+### ⚙️ Service Ports
+
+| Service | Port | Purpose |
+|----------|------|----------|
+| **Eureka Server** | `8761` | Service registry |
+| **API Gateway** | `8081` | Single ingress for clients |
+| **Balance Service** | `8080` | Projection engine |
+| **Ledger Service** | `8082` | Persistent events |
+| **Plaid Service** | `8083` | Sandbox bank integration |
+| **Postgres** | `5432` | Shared relational database |
+
+---
+
+## 🐳 Quick Start (Docker Compose)
+
 ```bash
-docker compose down -v --remove-orphans
-docker compose build --no-cache
-docker compose up -d
+docker compose down -v
+docker compose up -d --build
+curl http://localhost:8081/actuator/health
 ```
 
-### 3. Verify services are healthy
+### Verify All Services
+
 ```bash
 docker compose ps
-curl -s http://localhost:8761/actuator/health   # Eureka Server
-curl -s http://localhost:8080/actuator/health   # Balance Service
-curl -s http://localhost:8082/actuator/health   # Ledger Service
-curl -s http://localhost:8083/actuator/health   # Plaid Service
+```
+Expected healthy state:
+```
+NAME                                STATUS
+api-gateway                         healthy
+ledger-service                      healthy
+plaid-service                       healthy
+balance-service                     healthy
+eureka-server                       healthy
+postgres                            healthy
 ```
 
----
-
-## 📖 API Usage
-
-### ✅ Add Ledger Events (Debits / Credits)
+### Test Routes
 ```bash
-curl -s -H "Content-Type: application/json"   -d '[{"date":"2025-09-29","amount":-50.00,"description":"Test debit"}]'   "http://localhost:8082/api/ledger/events?userId=1"
+# Add a ledger event
+curl -fsS -X POST "http://localhost:8081/api/ledger/events?userId=1"   -H "Content-Type: application/json"   -d '[{"date":"2025-10-08","amount":-42.50,"description":"Sanity check"}]' | jq
+
+# Get all events
+curl -fsS http://localhost:8081/api/ledger/events?userId=1 | jq
 ```
 
-### ✅ Get Current Balance (Plaid Mock)
+---
+
+## 🧮 Idempotent Ledger Writes
+
+Duplicate financial events can wreak havoc on projections.  
+**Ledger Service** guarantees **idempotency** both at the application and database level.
+
+```sql
+CREATE UNIQUE INDEX uq_pending_events_natural
+  ON pending_events(user_id, event_date, amount, description);
+```
+
+- **App Guard:** `existsByUserIdAndDateAndAmountAndDescription()` prevents duplicates before insert.  
+- **DB Constraint:** unique index ensures absolute integrity.  
+- **Result:** safe retries, durable writes, consistent projections.
+
+---
+
+## 🔧 Developer Notes
+
+### Recommended JVM Flags
 ```bash
-curl -s "http://localhost:8083/api/plaid/balance?userId=1"
+JAVA_TOOL_OPTIONS="-XX:MaxRAMPercentage=75 -XX:+ExitOnOutOfMemoryError"
 ```
 
-### ✅ Get Projected Balance (Aggregated)
-```bash
-curl -s "http://localhost:8080/api/balance/running?userId=1"
+### Compose Dependencies
+Add `depends_on: condition: service_healthy` in your `docker-compose.yml` for predictable startup order:
+```
+ledger-service:
+  depends_on:
+    eureka-server:
+      condition: service_healthy
+    postgres:
+      condition: service_healthy
 ```
 
----
-
-## 📚 Swagger UIs
-- Balance → [http://localhost:8080/swagger-ui.html](http://localhost:8080/swagger-ui.html)  
-- Ledger → [http://localhost:8082/swagger-ui.html](http://localhost:8082/swagger-ui.html)  
-- Plaid → [http://localhost:8083/swagger-ui.html](http://localhost:8083/swagger-ui.html)  
-- Eureka → [http://localhost:8761](http://localhost:8761)  
-
----
-
-## 🧪 Example Workflow
-1. Add some debit/credit events in Ledger Service.  
-2. Check current balance from Plaid Service (mock).  
-3. Get aggregated projected balance from Balance Service.  
-4. View service registration in the Eureka Dashboard at `http://localhost:8761`.  
-
----
-
-## 🔗 Networking
-All services are attached to the custom Docker network **`bpnet`**.  
-This allows them to resolve each other by container name (`ledger-service`, `plaid-service`, `eureka-server`) instead of `localhost`.
-
----
-
-## 🤖 CI/CD
-GitHub Actions workflow:
-- Runs `mvn clean verify` for PRs into `dev`, `uat`, `main`, `prod`.  
-- Runs `mvn package -DskipTests` on pushes/tags for artifact builds.  
-- Uploads `.jar` artifacts for each service for deployment.  
-
----
-
-## 📂 Project Structure
+### Hibernate Optimization
 ```
-balance-predictor/
-├── balance-service/     # Aggregator service
-├── ledger-service/      # Transaction storage
-├── plaid-service/       # Mock bank API
-├── eureka-server/       # Service discovery
-├── docker-compose.yml   # Multi-service orchestration
-├── pom.xml              # Root aggregator POM
-└── README.md
+spring.jpa.open-in-view=false
 ```
 
 ---
 
-## 🧰 Postman Collection
-We provide a ready-to-use **Postman Collection** with all endpoints pre-configured.
+## 📊 Observability
 
-1. Import `postman/BalancePredictor.postman_collection.json` into Postman.  
-2. Use the predefined environment (`localhost`) or update to match your deployed environment.  
-3. Run the **Collection Runner** for end-to-end testing.  
+| Tool | Description |
+|------|--------------|
+| **Spring Actuator** | `/actuator/health`, `/actuator/info`, `/actuator/gateway/routes` for discovery & health. |
+| **Micrometer / Prometheus** | Ready for metrics collection and dashboarding. |
+| **Resilience4j (Optional)** | Add for retries, circuit breaking, and fallback patterns. |
+
+---
+
+## 🛠️ Local Development Makefile
+
+```makefile
+up:
+	docker compose up -d --build
+
+down:
+	docker compose down
+
+nuke:
+	docker compose down -v
+	rm -rf target
+
+logs:
+	docker compose logs -f --tail=100
+```
+
+---
+
+## 👩‍💻 Tech Stack
+
+| Layer | Tech |
+|-------|------|
+| Language | Java 17 |
+| Framework | Spring Boot 3.3.3 |
+| Service Discovery | Spring Cloud Eureka 2023.0.3 |
+| API Gateway | Spring Cloud Gateway |
+| Database | PostgreSQL 16 + Flyway |
+| Persistence | Spring Data JPA + HikariCP |
+| Containerization | Docker + Compose |
+| Testing | Postman + cURL + Testcontainers (future) |
+| CI/CD | GitHub Actions |
+| Docs | Swagger UI + Markdown |
+
+---
+
+## 🔍 Next Steps
+- [ ] Add Testcontainers-based integration test for Ledger Service
+- [ ] Add Grafana/Prometheus docker service for observability
+- [ ] Add screenshot of Plaid Sandbox flow in README
+- [ ] Include architecture diagram badge at top
 
 ---
 
 ## 📜 License
-This project is licensed under the MIT License.
+
+This project is licensed under the **MIT License**.
