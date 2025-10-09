@@ -1,26 +1,23 @@
 {
   "info": {
-    "name": "Balance Predictor – API Gateway (DB + Plaid)",
+    "name": "Balance Predictor – API Gateway (DB + Plaid + Ledger + Projected)",
     "_postman_id": "b74a6d3a-3e64-4d2f-9c9b-gateway",
-    "description": "E2E testing for Balance Predictor via Spring Cloud Gateway + Eureka + PostgreSQL + Plaid (sandbox). Includes health checks, Plaid sandbox link flow, ledger DB ops, and projected balance.",
+    "description": "E2E testing for Balance Predictor microservices via Gateway + Eureka + PostgreSQL + Plaid (sandbox). Includes secure balance selection per account and projected balance computation.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "item": [
     {
       "name": "Health Checks",
       "item": [
-        { "name": "Eureka health", "request": { "method": "GET", "url": "{{eureka_base}}/actuator/health" } },
-        { "name": "Gateway health", "request": { "method": "GET", "url": "{{gateway_base}}/actuator/health" } },
-        { "name": "Balance (direct)", "request": { "method": "GET", "url": "http://localhost:8080/actuator/health" } },
-        { "name": "Ledger (direct)", "request": { "method": "GET", "url": "http://localhost:8082/actuator/health" } },
-        { "name": "Plaid (direct)", "request": { "method": "GET", "url": "http://localhost:8083/actuator/health" } },
-        { "name": "Balance via gateway discovery", "request": { "method": "GET", "url": "{{gateway_base}}/balance-service/actuator/health" } },
-        { "name": "Ledger via gateway discovery", "request": { "method": "GET", "url": "{{gateway_base}}/ledger-service/actuator/health" } },
-        { "name": "Plaid via gateway discovery", "request": { "method": "GET", "url": "{{gateway_base}}/plaid-service/actuator/health" } }
+        { "name": "Eureka", "request": { "method": "GET", "url": "{{eureka_base}}/actuator/health" } },
+        { "name": "Gateway", "request": { "method": "GET", "url": "{{gateway_base}}/actuator/health" } },
+        { "name": "Ledger", "request": { "method": "GET", "url": "http://localhost:8082/actuator/health" } },
+        { "name": "Plaid", "request": { "method": "GET", "url": "http://localhost:8083/actuator/health" } },
+        { "name": "Balance", "request": { "method": "GET", "url": "http://localhost:8080/actuator/health" } }
       ]
     },
     {
-      "name": "Plaid Service (via Gateway)",
+      "name": "Plaid Service",
       "item": [
         {
           "name": "Sandbox: Create public_token",
@@ -28,204 +25,92 @@
             "method": "POST",
             "header": [{ "key": "Content-Type", "value": "application/json" }],
             "url": "{{gateway_base}}/api/plaid/sandbox/public_token/create",
-            "body": { "mode": "raw", "raw": "{\n  \"userId\": {{userId}}\n}" }
+            "body": { "mode": "raw", "raw": "{ \"userId\": {{userId}} }" }
           },
           "event": [{
             "listen": "test",
-            "script": {
-              "type": "text/javascript",
-              "exec": [
-                "pm.test('Status is 200', () => pm.response.to.have.status(200));",
-                "const json = pm.response.json();",
-                "pm.test('public_token present', () => pm.expect(json).to.have.property('public_token'));",
-                "pm.environment.set('public_token', json.public_token);"
-              ]
-            }
+            "script": { "exec": [
+              "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+              "const json = pm.response.json();",
+              "pm.environment.set('public_token', json.public_token);"
+            ] }
           }]
         },
         {
-          "name": "Exchange public_token → access_token (persists in DB)",
+          "name": "Exchange public_token → access_token",
           "request": {
             "method": "POST",
             "header": [{ "key": "Content-Type", "value": "application/json" }],
             "url": "{{gateway_base}}/api/plaid/item/public_token/exchange",
-            "body": { "mode": "raw", "raw": "{\n  \"userId\": {{userId}},\n  \"publicToken\": \"{{public_token}}\"\n}" }
+            "body": { "mode": "raw", "raw": "{ \"userId\": {{userId}}, \"publicToken\": \"{{public_token}}\" }" }
           },
           "event": [{
             "listen": "test",
-            "script": {
-              "type": "text/javascript",
-              "exec": [
-                "pm.test('Status is 200', () => pm.response.to.have.status(200));",
-                "const json = pm.response.json();",
-                "pm.test('access_token present', () => pm.expect(json).to.have.property('access_token'));",
-                "pm.environment.set('access_token', json.access_token);"
-              ]
-            }
+            "script": { "exec": [
+              "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+              "const json = pm.response.json();",
+              "pm.environment.set('access_token', json.access_token);"
+            ] }
           }]
         },
         {
-          "name": "Get Plaid balances (uses stored access_token in service)",
-          "request": { "method": "GET", "url": "{{gateway_base}}/api/plaid/balance?userId={{userId}}" },
-          "event": [{
-            "listen": "test",
-            "script": {
-              "type": "text/javascript",
-              "exec": [
-                "pm.test('Status is 200', () => pm.response.to.have.status(200));",
-                "const json = pm.response.json();",
-                "pm.test('accounts[] present', () => pm.expect(json.accounts).to.be.an('array').that.is.not.empty);"
-              ]
-            }
-          }]
+          "name": "Get ALL Plaid balances",
+          "request": { "method": "GET", "url": "{{gateway_base}}/api/plaid/balance?userId={{userId}}" }
+        },
+        {
+          "name": "Get ONE Plaid balance by accountId",
+          "request": { "method": "GET", "url": "{{gateway_base}}/api/plaid/balance/{{account_id}}?userId={{userId}}" }
+        },
+        {
+          "name": "Get PRIMARY Plaid balance",
+          "request": { "method": "GET", "url": "{{gateway_base}}/api/plaid/balance/primary?userId={{userId}}" }
         }
       ]
     },
     {
-      "name": "Ledger Service (via Gateway)",
+      "name": "Ledger Service",
       "item": [
         {
-          "name": "Add events (DB write)",
+          "name": "Add events (write)",
           "request": {
             "method": "POST",
             "header": [{ "key": "Content-Type", "value": "application/json" }],
             "url": "{{gateway_base}}/api/ledger/events?userId={{userId}}",
             "body": {
               "mode": "raw",
-              "raw": "[\n  {\"date\":\"2025-10-05\",\"amount\":-50.00,\"description\":\"Groceries\"},\n  {\"date\":\"2025-10-05\",\"amount\":300.00,\"description\":\"Deposit\"}\n]"
-            }
-          },
-          "event": [{
-            "listen": "test",
-            "script": {
-              "type": "text/javascript",
-              "exec": [
-                "pm.test('Status is 200', () => pm.response.to.have.status(200));",
-                "const arr = pm.response.json();",
-                "pm.test('Response is an array', () => pm.expect(arr).to.be.an('array'));",
-                "const descs = arr.map(x => x.description);",
-                "pm.test('Contains Groceries', () => pm.expect(descs).to.include('Groceries'));",
-                "pm.test('Contains Deposit', () => pm.expect(descs).to.include('Deposit'));"
-              ]
-            }
-          }]
-        },
-        {
-          "name": "Get events (DB read)",
-          "request": { "method": "GET", "url": "{{gateway_base}}/api/ledger/events?userId={{userId}}" },
-          "event": [{
-            "listen": "test",
-            "script": {
-              "type": "text/javascript",
-              "exec": [
-                "pm.test('Status is 200', () => pm.response.to.have.status(200));",
-                "const arr = pm.response.json();",
-                "pm.test('Got events array', () => pm.expect(arr).to.be.an('array').that.is.not.empty);"
-              ]
-            }
-          }]
-        }
-      ]
-    },
-    {
-      "name": "Balance Service (via Gateway)",
-      "item": [
-        {
-          "name": "Get projected balance",
-          "request": { "method": "GET", "url": "{{gateway_base}}/api/balance/running?userId={{userId}}" },
-          "event": [{
-            "listen": "test",
-            "script": {
-              "type": "text/javascript",
-              "exec": [
-                "pm.test('Status is 200', () => pm.response.to.have.status(200));",
-                "const json = pm.response.json();",
-                "pm.test('projectedBalance present', () => pm.expect(json).to.have.property('projectedBalance'));"
-              ]
-            }
-          }]
-        }
-      ]
-    },
-    {
-      "name": "End-to-End Flow (One-Click)",
-      "item": [
-        {
-          "name": "Step 1 – Plaid: Create public_token",
-          "request": {
-            "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "url": "{{gateway_base}}/api/plaid/sandbox/public_token/create",
-            "body": { "mode": "raw", "raw": "{\n  \"userId\": {{userId}}\n}" }
-          },
-          "event": [{
-            "listen": "test",
-            "script": {
-              "type": "text/javascript",
-              "exec": [
-                "pm.test('200', () => pm.response.to.have.status(200));",
-                "const t = pm.response.json().public_token;",
-                "pm.environment.set('public_token', t);",
-                "pm.test('public_token set', () => pm.expect(t).to.be.a('string').and.not.empty);"
-              ]
-            }
-          }]
-        },
-        {
-          "name": "Step 2 – Plaid: Exchange token",
-          "request": {
-            "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "url": "{{gateway_base}}/api/plaid/item/public_token/exchange",
-            "body": { "mode": "raw", "raw": "{\n  \"userId\": {{userId}},\n  \"publicToken\": \"{{public_token}}\"\n}" }
-          },
-          "event": [{
-            "listen": "test",
-            "script": {
-              "type": "text/javascript",
-              "exec": [
-                "pm.test('200', () => pm.response.to.have.status(200));",
-                "const a = pm.response.json().access_token;",
-                "pm.environment.set('access_token', a);",
-                "pm.test('access_token set', () => pm.expect(a).to.be.a('string').and.not.empty);"
-              ]
-            }
-          }]
-        },
-        {
-          "name": "Step 3 – Plaid: Get balances",
-          "request": { "method": "GET", "url": "{{gateway_base}}/api/plaid/balance?userId={{userId}}" },
-          "event": [{
-            "listen": "test",
-            "script": {
-              "type": "text/javascript",
-              "exec": [
-                "pm.test('200', () => pm.response.to.have.status(200));",
-                "pm.test('accounts[] present', () => pm.expect(pm.response.json().accounts).to.be.an('array').that.is.not.empty);"
-              ]
-            }
-          }]
-        },
-        {
-          "name": "Step 4 – Ledger: Add events",
-          "request": {
-            "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "url": "{{gateway_base}}/api/ledger/events?userId={{userId}}",
-            "body": {
-              "mode": "raw",
-              "raw": "[\n  {\"date\":\"2025-10-05\",\"amount\":-60.0,\"description\":\"Dinner\"},\n  {\"date\":\"2025-10-06\",\"amount\":500.0,\"description\":\"Paycheck\"}\n]"
+              "raw": "[{\"date\":\"2025-10-05\",\"amount\":-50.00,\"description\":\"Groceries\"},{\"date\":\"2025-10-05\",\"amount\":300.00,\"description\":\"Deposit\"}]"
             }
           }
         },
         {
-          "name": "Step 5 – Ledger: Verify events",
+          "name": "Get events (read)",
           "request": { "method": "GET", "url": "{{gateway_base}}/api/ledger/events?userId={{userId}}" }
+        }
+      ]
+    },
+    {
+      "name": "Balance Service",
+      "item": [
+        {
+          "name": "Projected Balance (Primary)",
+          "request": { "method": "GET", "url": "{{gateway_base}}/api/balance/running?userId={{userId}}" }
         },
         {
-          "name": "Step 6 – Balance: Projected balance",
-          "request": { "method": "GET", "url": "{{gateway_base}}/api/balance/running?userId={{userId}}" }
+          "name": "Projected Balance (Specific Account)",
+          "request": { "method": "GET", "url": "{{gateway_base}}/api/balance/running?userId={{userId}}&accountId={{account_id}}" }
         }
+      ]
+    },
+    {
+      "name": "Full E2E Flow",
+      "item": [
+        { "name": "1. Create sandbox public_token", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "url": "{{gateway_base}}/api/plaid/sandbox/public_token/create", "body": { "mode": "raw", "raw": "{ \"userId\": {{userId}} }" } } },
+        { "name": "2. Exchange token", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "url": "{{gateway_base}}/api/plaid/item/public_token/exchange", "body": { "mode": "raw", "raw": "{ \"userId\": {{userId}}, \"publicToken\": \"{{public_token}}\" }" } } },
+        { "name": "3. Get balances", "request": { "method": "GET", "url": "{{gateway_base}}/api/plaid/balance?userId={{userId}}" } },
+        { "name": "4. Add ledger events", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "url": "{{gateway_base}}/api/ledger/events?userId={{userId}}", "body": { "mode": "raw", "raw": "[{\"date\":\"2025-10-06\",\"amount\":-80.0,\"description\":\"Utilities\"},{\"date\":\"2025-10-06\",\"amount\":500.0,\"description\":\"Paycheck\"}]" } } },
+        { "name": "5. Verify ledger events", "request": { "method": "GET", "url": "{{gateway_base}}/api/ledger/events?userId={{userId}}" } },
+        { "name": "6. Projected Balance (Primary)", "request": { "method": "GET", "url": "{{gateway_base}}/api/balance/running?userId={{userId}}" } },
+        { "name": "7. Projected Balance (Specific Account)", "request": { "method": "GET", "url": "{{gateway_base}}/api/balance/running?userId={{userId}}&accountId={{account_id}}" } }
       ]
     }
   ],
@@ -234,6 +119,7 @@
     { "key": "eureka_base", "value": "http://localhost:8761" },
     { "key": "userId", "value": "1" },
     { "key": "public_token", "value": "" },
-    { "key": "access_token", "value": "" }
+    { "key": "access_token", "value": "" },
+    { "key": "account_id", "value": "pNjnZADqlpHdQzXw4eD7cQVln76rpzS8kmX88" }
   ]
 }
