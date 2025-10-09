@@ -11,7 +11,8 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
 
-import java.util.Map;
+import java.util.*;
+import java.util.function.Predicate;
 
 @RestController
 @RequestMapping("/api/plaid")
@@ -37,7 +38,10 @@ public class PlaidController {
   private static final ParameterizedTypeReference<Map<String, Object>> MAP_REF =
           new ParameterizedTypeReference<>() {};
 
-  /** Create a Link token (front-end usually uses this). */
+  // =====================================================
+  // LINK + SANDBOX + TOKEN EXCHANGE
+  // =====================================================
+
   @PostMapping(path = "/link/token/create", produces = MediaType.APPLICATION_JSON_VALUE)
   public Mono<Map<String, Object>> createLinkToken(@RequestBody LinkTokenCreateRequest req) {
     Assert.notNull(req.userId(), "userId required");
@@ -61,7 +65,6 @@ public class PlaidController {
             .bodyToMono(MAP_REF);
   }
 
-  /** Sandbox helper: get a public_token without Link UI. */
   @PostMapping(path = "/sandbox/public_token/create", produces = MediaType.APPLICATION_JSON_VALUE)
   public Mono<Map<String, Object>> sandboxPublicToken(@RequestBody LinkTokenCreateRequest req) {
     Assert.notNull(req.userId(), "userId required");
@@ -69,7 +72,7 @@ public class PlaidController {
     var body = Map.of(
             "client_id", clientId,
             "secret", secret,
-            "institution_id", "ins_109508",              // Plaid sandbox “Chase” / First Platypus Bank
+            "institution_id", "ins_109508",
             "initial_products", new String[]{"transactions"}
     );
 
@@ -81,7 +84,6 @@ public class PlaidController {
             .bodyToMono(MAP_REF);
   }
 
-  /** Exchange public_token -> access_token and persist it (access_token + item_id). */
   @PostMapping(path = "/item/public_token/exchange", produces = MediaType.APPLICATION_JSON_VALUE)
   public Mono<Map<String, Object>> exchangePublicToken(@RequestBody PublicTokenExchangeRequest req) {
     Assert.notNull(req.userId(), "userId required");
@@ -103,14 +105,17 @@ public class PlaidController {
               var accessToken = (String) resp.get("access_token");
               var itemId      = (String) resp.get("item_id");
               if (accessToken != null && itemId != null) {
-                // DB-backed store: upsert by userId
                 tokenStore.put(req.userId(), accessToken, itemId);
               }
               return resp;
             });
   }
 
-  /** Real balances from Plaid sandbox via /accounts/balance/get. */
+  // =====================================================
+  // BALANCE ENDPOINTS
+  // =====================================================
+
+  /** Raw Plaid balances (unchanged). */
   @GetMapping(path = "/balance", produces = MediaType.APPLICATION_JSON_VALUE)
   public Mono<Map<String, Object>> getBalance(@RequestParam Long userId) {
     var accessToken = tokenStore.get(userId);
@@ -133,5 +138,143 @@ public class PlaidController {
             .bodyValue(body)
             .retrieve()
             .bodyToMono(MAP_REF);
+  }
+
+  // --- NEW: balance for a specific Plaid account_id ---
+  @GetMapping(path = "/balance/{accountId}", produces = MediaType.APPLICATION_JSON_VALUE)
+  public Mono<Map<String, Object>> getBalanceForAccount(
+          @RequestParam Long userId,
+          @PathVariable String accountId) {
+
+    var accessToken = tokenStore.get(userId);
+    if (accessToken == null) {
+      return Mono.just(Map.of(
+              "error", "NO_ACCESS_TOKEN",
+              "message", "Exchange a public_token first for this userId."
+      ));
+    }
+
+    var body = Map.of(
+            "client_id", clientId,
+            "secret", secret,
+            "access_token", accessToken
+    );
+
+    return plaid.post()
+            .uri("/accounts/balance/get")
+            .contentType(MediaType.APPLICATION_JSON)
+            .bodyValue(body)
+            .retrieve()
+            .bodyToMono(MAP_REF)
+            .map(resp -> {
+              @SuppressWarnings("unchecked")
+              var accounts = (java.util.List<java.util.Map<String, Object>>) resp.getOrDefault("accounts", java.util.List.of());
+              var match = accounts.stream()
+                      .filter(a -> accountId.equals(a.get("account_id")))
+                      .findFirst()
+                      .orElse(null);
+
+              if (match == null) {
+                return Map.of(
+                        "error", "ACCOUNT_NOT_FOUND",
+                        "accountId", accountId
+                );
+              }
+
+              @SuppressWarnings("unchecked")
+              var balances = (java.util.Map<String, Object>) match.get("balances");
+              var currency = balances.get("iso_currency_code") != null
+                      ? balances.get("iso_currency_code")
+                      : balances.get("unofficial_currency_code");
+
+              return Map.of(
+                      "balance", Map.of(
+                              "account_id", match.get("account_id"),
+                              "name", match.get("name"),
+                              "mask", match.get("mask"),
+                              "type", match.get("type"),
+                              "subtype", match.get("subtype"),
+                              "available", balances.get("available"),
+                              "current", balances.get("current"),
+                              "currency", currency
+                      )
+              );
+            });
+  }
+
+  /** Clean version — pick one account (by id or best default). */
+  @GetMapping(path = "/balance/primary", produces = MediaType.APPLICATION_JSON_VALUE)
+  public Mono<Map<String, Object>> getPrimaryBalance(
+          @RequestParam Long userId,
+          @RequestParam(required = false) String accountId) {
+
+    var accessToken = tokenStore.get(userId);
+    if (accessToken == null) {
+      return Mono.just(Map.of("error", "NO_ACCESS_TOKEN", "message", "Exchange a public_token first."));
+    }
+
+    var body = Map.of(
+            "client_id", clientId,
+            "secret", secret,
+            "access_token", accessToken
+    );
+
+    return plaid.post()
+            .uri("/accounts/balance/get")
+            .contentType(MediaType.APPLICATION_JSON)
+            .bodyValue(body)
+            .retrieve()
+            .bodyToMono(MAP_REF)
+            .map(resp -> Map.of("balance", extractPrimaryBalance(resp, accountId)));
+  }
+
+  // =====================================================
+  // HELPER METHODS
+  // =====================================================
+
+  @SuppressWarnings("unchecked")
+  private Map<String, Object> extractPrimaryBalance(Map<String, Object> resp, String preferredId) {
+    var accounts = (List<Map<String, Object>>) resp.getOrDefault("accounts", List.of());
+    if (accounts.isEmpty()) return Map.of("error", "No accounts returned");
+
+    Map<String, Object> chosen = null;
+
+    if (preferredId != null) {
+      chosen = accounts.stream()
+              .filter(a -> preferredId.equals(a.get("account_id")))
+              .findFirst()
+              .orElse(null);
+    }
+
+    if (chosen == null) chosen = find(accounts, a -> "depository".equals(a.get("type")) && "checking".equals(a.get("subtype")));
+    if (chosen == null) chosen = find(accounts, a -> "depository".equals(a.get("type")) && "savings".equals(a.get("subtype")));
+    if (chosen == null) chosen = find(accounts, a -> {
+      var b = (Map<String, Object>) a.get("balances");
+      return b != null && (b.get("available") != null || b.get("current") != null);
+    });
+    if (chosen == null) chosen = accounts.get(0);
+
+    var balances = (Map<String, Object>) chosen.get("balances");
+    var available = balances.get("available");
+    var current = balances.get("current");
+    var currency = balances.get("iso_currency_code") != null
+            ? balances.get("iso_currency_code")
+            : balances.get("unofficial_currency_code");
+
+    return Map.of(
+            "account_id", chosen.get("account_id"),
+            "name", chosen.get("name"),
+            "mask", chosen.get("mask"),
+            "type", chosen.get("type"),
+            "subtype", chosen.get("subtype"),
+            "available", available,
+            "current", current,
+            "currency", currency
+    );
+  }
+
+  private static Map<String, Object> find(List<Map<String, Object>> list, Predicate<Map<String, Object>> predicate) {
+    for (var a : list) if (predicate.test(a)) return a;
+    return null;
   }
 }

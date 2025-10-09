@@ -15,16 +15,44 @@ public class BalanceCalcService {
   private final WebClient plaidClient;
 
   public BalanceCalcService(WebClient.Builder lb) {
-    // use Eureka logical service names (SPRING_APPLICATION_NAME)
+    // Use Eureka logical service names (SPRING_APPLICATION_NAME)
     this.ledgerClient = lb.baseUrl("http://LEDGER-SERVICE").build();
     this.plaidClient  = lb.baseUrl("http://PLAID-SERVICE").build();
   }
 
+  /** Calculates projected balance using the user's default/primary account */
   public Mono<Double> projectedBalance(Long userId) {
     Mono<AccountBalance> base = plaidClient.get()
             .uri(uri -> uri.path("/api/plaid/balance")
                     .queryParam("userId", userId)
                     .build())
+            .retrieve()
+            .bodyToMono(AccountBalance.class);
+
+    Mono<List<PendingEvent>> events = ledgerClient.get()
+            .uri(uri -> uri.path("/api/ledger/events")
+                    .queryParam("userId", userId)
+                    .build())
+            .retrieve()
+            .bodyToFlux(PendingEvent.class)
+            .collectList();
+
+    return Mono.zip(base, events).map(tuple -> {
+      double current = tuple.getT1().currentBalance();
+      double pendingSum = tuple.getT2()
+              .stream()
+              .mapToDouble(PendingEvent::amount)
+              .sum();
+      return current + pendingSum;
+    });
+  }
+
+  /** Calculates projected balance for a specific Plaid account */
+  public Mono<Double> projectedBalanceForAccount(Long userId, String accountId) {
+    Mono<AccountBalance> base = plaidClient.get()
+            .uri(uri -> uri.path("/api/plaid/balance/{accountId}")
+                    .queryParam("userId", userId)
+                    .build(accountId))
             .retrieve()
             .bodyToMono(AccountBalance.class);
 
