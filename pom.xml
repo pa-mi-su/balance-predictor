@@ -23,6 +23,7 @@
         <module>ledger-service</module>
         <module>plaid-service</module>
         <module>eureka-server</module>
+        <module>api-gateway</module>
     </modules>
 
     <properties>

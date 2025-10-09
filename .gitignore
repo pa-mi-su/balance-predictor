@@ -1,21 +1,90 @@
+# ==========================
 # Build outputs
+# ==========================
 **/target/
 **/out/
 *.jar
 *.war
 *.log
 
-# IDE
+# ==========================
+# IDE / Tooling
+# ==========================
 .idea/
 *.iml
 .vscode/
 .project
 .classpath
 .settings/
+*.swp
+*.swo
+*.bak
 
-# OS
+# ==========================
+# OS / Misc
+# ==========================
 .DS_Store
 Thumbs.db
+ehthumbs.db
+desktop.ini
 
-# Docker
+# ==========================
+# Docker / Env / Secrets
+# ==========================
 **/.env
+docker-compose.override.yml
+.env.local
+.env.dev
+.env.prod
+
+# ==========================
+# Maven / Gradle caches
+# ==========================
+.mvn/wrapper/maven-wrapper.jar
+.mvn/wrapper/maven-wrapper.properties
+.mvn/timing.properties
+**/.mvn
+**/.gradle
+.gradle/
+
+# ==========================
+# Logs & temp files
+# ==========================
+*.tmp
+*.temp
+*.pid
+*.seed
+*.log.*
+
+# ==========================
+# Postman / HTTP Clients
+# ==========================
+*.postman_collection
+*.postman_environment
+.httpclient
+.rest-client
+
+# ==========================
+# JetBrains Rider / IntelliJ
+# ==========================
+.idea_modules/
+.idea_modules.xml
+
+# ==========================
+# Java-specific artifacts
+# ==========================
+hs_err_pid*
+replay_pid*
+
+# Node / frontend (if you ever add one)
+node_modules/
+dist/
+build/
+
+# Docker cache & tmp dirs
+**/.docker-build-cache/
+**/tmp/
+
+# IntelliJ workspace files (just for safety)
+.idea/**/workspace.xml
+.idea/**/tasks.xml
