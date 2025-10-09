@@ -54,6 +54,9 @@ services:
       SERVER_PORT: 8082
       MANAGEMENT_SERVER_PORT: 8082
 
+      AUTH_ISSUER: http://auth-service:8084
+      AUTH_JWKS_URI: http://auth-service:8084/oauth2/jwks
+
       # Eureka (your services read EUREKA_DEFAULT_ZONE in application.properties)
       EUREKA_DEFAULT_ZONE: http://eureka-server:8761/eureka
 
@@ -94,6 +97,9 @@ services:
       SERVER_PORT: 8083
       MANAGEMENT_SERVER_PORT: 8083
       EUREKA_DEFAULT_ZONE: http://eureka-server:8761/eureka
+
+      AUTH_ISSUER: http://auth-service:8084
+      AUTH_JWKS_URI: http://auth-service:8084/oauth2/jwks
 
       # Plaid Sandbox credentials
       PLAID_ENV: ${PLAID_ENV}
@@ -140,6 +146,9 @@ services:
       SERVER_PORT: 8080
       MANAGEMENT_SERVER_PORT: 8080
       EUREKA_DEFAULT_ZONE: http://eureka-server:8761/eureka
+
+      AUTH_ISSUER: http://auth-service:8084
+      AUTH_JWKS_URI: http://auth-service:8084/oauth2/jwks
       # No LEDGER/PLAID base URLs — resolved via Eureka
     depends_on:
       eureka-server:
@@ -169,6 +178,9 @@ services:
       SERVER_PORT: 8081
       MANAGEMENT_SERVER_PORT: 8081
       EUREKA_DEFAULT_ZONE: http://eureka-server:8761/eureka
+
+      AUTH_ISSUER: http://auth-service:8084
+      AUTH_JWKS_URI: http://auth-service:8084/oauth2/jwks
     depends_on:
       eureka-server:
         condition: service_healthy
@@ -185,6 +197,25 @@ services:
       retries: 30
       start_period: 20s
     restart: unless-stopped
+
+  auth-service:
+    build:
+      context: ./auth-service
+    image: auth-service:local
+    depends_on:
+      - postgres
+      - eureka-server
+    environment:
+      EUREKA_DEFAULT_ZONE: http://eureka-server:8761/eureka
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/bpdb
+      SPRING_DATASOURCE_USERNAME: bpuser
+      SPRING_DATASOURCE_PASSWORD: bppass
+      AUTH_ISSUER: http://auth-service:8084
+      # optional: provide stable keys for dev (base64 of PEMs)
+      # AUTH_PRIVATE_KEY_PEM_B64: <paste>
+      # AUTH_PUBLIC_KEY_PEM_B64:  <paste>
+    ports:
+      - "8084:8084"
 
 networks:
   default:
