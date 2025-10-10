@@ -186,6 +186,29 @@ services:
       start_period: 20s
     restart: unless-stopped
 
+  auth-service:
+    build:
+      context: .
+      dockerfile: auth-service/Dockerfile
+    image: auth-service:local
+    container_name: auth-service
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/bpdb
+      SPRING_DATASOURCE_USERNAME: bpuser
+      SPRING_DATASOURCE_PASSWORD: bppass
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "8084:8084"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8084/actuator/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 10s
+    restart: unless-stopped
+
 networks:
   default:
     name: bpnet
