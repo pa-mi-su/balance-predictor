@@ -196,6 +196,7 @@ services:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/bpdb
       SPRING_DATASOURCE_USERNAME: bpuser
       SPRING_DATASOURCE_PASSWORD: bppass
+      EUREKA_DEFAULT_ZONE: http://eureka-server:8761/eureka
     depends_on:
       postgres:
         condition: service_healthy
