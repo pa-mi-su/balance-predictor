@@ -89,15 +89,6 @@ eureka-server                       healthy
 postgres                            healthy
 ```
 
-### Test Routes
-```bash
-# Add a ledger event
-curl -fsS -X POST "http://localhost:8081/api/ledger/events?userId=1"   -H "Content-Type: application/json"   -d '[{"date":"2025-10-08","amount":-42.50,"description":"Sanity check"}]' | jq
-
-# Get all events
-curl -fsS http://localhost:8081/api/ledger/events?userId=1 | jq
-```
-
 ---
 
 ## 🧮 Idempotent Ledger Writes
@@ -116,31 +107,6 @@ CREATE UNIQUE INDEX uq_pending_events_natural
 
 ---
 
-## 🔧 Developer Notes
-
-### Recommended JVM Flags
-```bash
-JAVA_TOOL_OPTIONS="-XX:MaxRAMPercentage=75 -XX:+ExitOnOutOfMemoryError"
-```
-
-### Compose Dependencies
-Add `depends_on: condition: service_healthy` in your `docker-compose.yml` for predictable startup order:
-```
-ledger-service:
-  depends_on:
-    eureka-server:
-      condition: service_healthy
-    postgres:
-      condition: service_healthy
-```
-
-### Hibernate Optimization
-```
-spring.jpa.open-in-view=false
-```
-
----
-
 ## 📊 Observability
 
 | Tool | Description |
@@ -148,25 +114,6 @@ spring.jpa.open-in-view=false
 | **Spring Actuator** | `/actuator/health`, `/actuator/info`, `/actuator/gateway/routes` for discovery & health. |
 | **Micrometer / Prometheus** | Ready for metrics collection and dashboarding. |
 | **Resilience4j (Optional)** | Add for retries, circuit breaking, and fallback patterns. |
-
----
-
-## 🛠️ Local Development Makefile
-
-```makefile
-up:
-	docker compose up -d --build
-
-down:
-	docker compose down
-
-nuke:
-	docker compose down -v
-	rm -rf target
-
-logs:
-	docker compose logs -f --tail=100
-```
 
 ---
 
@@ -377,6 +324,74 @@ sequenceDiagram
 > 💡 **Architecture Goal:** A polished, security-first microservice system designed for scalability, modularity, and clarity — ideal for both enterprise-grade deployment and portfolio demonstration.
 
 ---
+
+## 💣 Full Reset & Rebuild (Nuke Everything 🔁)
+
+When things get messy or schema changes break Flyway, use this to completely **wipe and rebuild** your entire environment — containers, networks, volumes, and images.
+
+```bash
+# Stop and remove all running containers
+docker compose down --remove-orphans
+
+# Remove all project images (auth, gateway, ledger, balance, plaid, etc.)
+docker rmi $(docker images "auth-service:local" -q) \
+  $(docker images "api-gateway:local" -q) \
+  $(docker images "ledger-service:local" -q) \
+  $(docker images "balance-service:local" -q) \
+  $(docker images "plaid-service:local" -q) \
+  $(docker images "eureka-server:local" -q) 2>/dev/null || true
+
+# Remove volumes and networks for a true clean slate
+docker volume rm $(docker volume ls -qf name=pgdata) 2>/dev/null || true
+docker network rm bpnet 2>/dev/null || true
+
+# Optional: prune EVERYTHING (⚠️ deletes all unused Docker data system-wide)
+# docker system prune -af --volumes
+
+# Verify cleanup
+docker ps -a
+docker volume ls
+docker images | grep -E "auth|gateway|ledger|balance|plaid|eureka"
+
+# Rebuild all services fresh
+docker compose build --no-cache
+
+# Bring everything up clean
+docker compose up -d
+
+# Watch startup logs (Ctrl+C to exit)
+docker compose logs -f
+```
+
+### 🩺 Verify Health
+Once everything is up:
+```bash
+docker compose ps
+```
+✅ Expected: all services show **(healthy)** after 15–30 seconds.
+
+### ✅ Sanity Checks
+```bash
+curl -s http://localhost:8761/actuator/health   # Eureka
+curl -s http://localhost:8084/api/auth/health   # Auth Service
+curl -s http://localhost:8081/actuator/health   # Gateway
+```
+
+If all return `{"status":"UP"}` — your stack is fully rebuilt and ready.
+
+---
+
+## ⚡ Quick Reset for Daily Dev
+
+Use this **3-line shortcut** when you just want to refresh everything without nuking Docker cache or volumes.
+
+```bash
+docker compose down -v --remove-orphans
+docker compose build --no-cache
+docker compose up -d && docker compose logs -f
+```
+
+💡 *Use this before testing new code, migrations, or config changes to guarantee a clean rebuild without a full nuke.*
 
 ---
 
