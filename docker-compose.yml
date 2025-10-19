@@ -41,14 +41,12 @@ services:
       retries: 20
     restart: unless-stopped
 
-  # --- Core Services ---
+  # --- Core Services (internal only: no published ports) ---
   ledger-service:
     build:
       context: .
       dockerfile: ledger-service/Dockerfile
     image: ledger-service:local
-    ports:
-      - "8082:8082"
     environment:
       SPRING_APPLICATION_NAME: ledger-service
       SERVER_PORT: 8082
@@ -87,8 +85,6 @@ services:
       dockerfile: plaid-service/Dockerfile
     image: plaid-service:local
     container_name: plaid-service
-    ports:
-      - "8083:8083"
     environment:
       SPRING_APPLICATION_NAME: plaid-service
       SERVER_PORT: 8083
@@ -133,8 +129,6 @@ services:
       context: .
       dockerfile: balance-service/Dockerfile
     image: balance-service:local
-    ports:
-      - "8080:8080"
     environment:
       SPRING_APPLICATION_NAME: balance-service
       SERVER_PORT: 8080
@@ -156,7 +150,7 @@ services:
       start_period: 20s
     restart: unless-stopped
 
-  # --- API Gateway ---
+  # --- API Gateway (public) ---
   api-gateway:
     build:
       context: .
@@ -186,14 +180,13 @@ services:
       start_period: 20s
     restart: unless-stopped
 
+  # --- Auth Service (internal only) ---
   auth-service:
     build:
       context: .
       dockerfile: auth-service/Dockerfile
     image: auth-service:local
     container_name: auth-service
-    ports:
-      - "8084:8084"
     environment:
       SPRING_APPLICATION_NAME: auth-service
       SERVER_PORT: 8084
@@ -207,7 +200,7 @@ services:
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
 
-      # JWT (pulled from .env; app should fail fast if missing)
+      # JWT (kept for future use; not exposed yet)
       AUTH_JWT_SECRET: ${AUTH_JWT_SECRET}
       AUTH_JWT_EXPIRES_MIN: ${AUTH_JWT_EXPIRES_MIN:-120}
     depends_on:
