@@ -22,52 +22,50 @@ services:
       start_period: 15s
     restart: unless-stopped
 
-  # --- Database (new) ---
+  # --- Database ---
   postgres:
     image: postgres:16-alpine
     container_name: bp-postgres
     environment:
-      POSTGRES_DB: bpdb
-      POSTGRES_USER: bpuser
-      POSTGRES_PASSWORD: bppass
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     ports:
-      - "5432:5432" # optional for local tools
+      - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U bpuser -d bpdb"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 5s
       timeout: 3s
       retries: 20
     restart: unless-stopped
 
-  # --- Core Services ---
+  # --- Core Services (internal only: no published ports) ---
   ledger-service:
     build:
       context: .
       dockerfile: ledger-service/Dockerfile
     image: ledger-service:local
-    ports:
-      - "8082:8082"
     environment:
       SPRING_APPLICATION_NAME: ledger-service
       SERVER_PORT: 8082
       MANAGEMENT_SERVER_PORT: 8082
 
-      # Eureka (your services read EUREKA_DEFAULT_ZONE in application.properties)
-      EUREKA_DEFAULT_ZONE: http://eureka-server:8761/eureka
+      # Eureka
+      EUREKA_DEFAULT_ZONE: ${EUREKA_URL}
 
       # DB config (JPA + Flyway)
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/bpdb
-      SPRING_DATASOURCE_USERNAME: bpuser
-      SPRING_DATASOURCE_PASSWORD: bppass
+      SPRING_DATASOURCE_URL: jdbc:postgresql://${POSTGRES_HOST:-postgres}:${POSTGRES_PORT:-5432}/${POSTGRES_DB}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
       SPRING_JPA_HIBERNATE_DDL_AUTO: validate
       SPRING_JPA_SHOW_SQL: "false"
       SPRING_JPA_PROPERTIES_HIBERNATE_DIALECT: org.hibernate.dialect.PostgreSQLDialect
       SPRING_FLYWAY_ENABLED: "true"
-      SPRING_FLYWAY_URL: jdbc:postgresql://postgres:5432/bpdb
-      SPRING_FLYWAY_USER: bpuser
-      SPRING_FLYWAY_PASSWORD: bppass
+      SPRING_FLYWAY_URL: jdbc:postgresql://${POSTGRES_HOST:-postgres}:${POSTGRES_PORT:-5432}/${POSTGRES_DB}
+      SPRING_FLYWAY_USER: ${POSTGRES_USER}
+      SPRING_FLYWAY_PASSWORD: ${POSTGRES_PASSWORD}
     depends_on:
       eureka-server:
         condition: service_healthy
@@ -87,41 +85,39 @@ services:
       dockerfile: plaid-service/Dockerfile
     image: plaid-service:local
     container_name: plaid-service
-    ports:
-      - "8083:8083"
     environment:
       SPRING_APPLICATION_NAME: plaid-service
       SERVER_PORT: 8083
       MANAGEMENT_SERVER_PORT: 8083
-      EUREKA_DEFAULT_ZONE: http://eureka-server:8761/eureka
+
+      # Eureka
+      EUREKA_DEFAULT_ZONE: ${EUREKA_URL}
 
       # Plaid Sandbox credentials
       PLAID_ENV: ${PLAID_ENV}
       PLAID_CLIENT_ID: ${PLAID_CLIENT_ID}
       PLAID_SECRET: ${PLAID_SECRET}
-      PLAID_WEBHOOK_URL: ${PLAID_WEBHOOK_URL}
+      PLAID_WEBHOOK_URL: ${PLAID_WEBHOOK_URL:-}
 
-      # --- Postgres + Flyway + JPA ---
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/bpdb
-      SPRING_DATASOURCE_USERNAME: bpuser
-      SPRING_DATASOURCE_PASSWORD: bppass
+      # Postgres + Flyway + JPA
+      SPRING_DATASOURCE_URL: jdbc:postgresql://${POSTGRES_HOST:-postgres}:${POSTGRES_PORT:-5432}/${POSTGRES_DB}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
       SPRING_JPA_HIBERNATE_DDL_AUTO: validate
       SPRING_JPA_SHOW_SQL: "false"
       SPRING_JPA_PROPERTIES_HIBERNATE_DIALECT: org.hibernate.dialect.PostgreSQLDialect
       SPRING_FLYWAY_ENABLED: "true"
-      SPRING_FLYWAY_URL: jdbc:postgresql://postgres:5432/bpdb
-      SPRING_FLYWAY_USER: bpuser
-      SPRING_FLYWAY_PASSWORD: bppass
+      SPRING_FLYWAY_URL: jdbc:postgresql://${POSTGRES_HOST:-postgres}:${POSTGRES_PORT:-5432}/${POSTGRES_DB}
+      SPRING_FLYWAY_USER: ${POSTGRES_USER}
+      SPRING_FLYWAY_PASSWORD: ${POSTGRES_PASSWORD}
       SPRING_FLYWAY_BASELINE_ON_MIGRATE: "true"
-
     depends_on:
       eureka-server:
         condition: service_healthy
       postgres:
-        condition: service_healthy  # 👈 Added so Flyway waits until DB is ready
-
+        condition: service_healthy
     healthcheck:
-      test: [ "CMD", "curl", "-fsS", "http://localhost:8083/actuator/health" ]
+      test: ["CMD", "curl", "-fsS", "http://localhost:8083/actuator/health"]
       interval: 5s
       timeout: 3s
       retries: 20
@@ -133,13 +129,11 @@ services:
       context: .
       dockerfile: balance-service/Dockerfile
     image: balance-service:local
-    ports:
-      - "8080:8080"
     environment:
       SPRING_APPLICATION_NAME: balance-service
       SERVER_PORT: 8080
       MANAGEMENT_SERVER_PORT: 8080
-      EUREKA_DEFAULT_ZONE: http://eureka-server:8761/eureka
+      EUREKA_DEFAULT_ZONE: ${EUREKA_URL}
       # No LEDGER/PLAID base URLs — resolved via Eureka
     depends_on:
       eureka-server:
@@ -156,7 +150,7 @@ services:
       start_period: 20s
     restart: unless-stopped
 
-  # --- API Gateway ---
+  # --- API Gateway (public) ---
   api-gateway:
     build:
       context: .
@@ -168,7 +162,7 @@ services:
       SPRING_APPLICATION_NAME: api-gateway
       SERVER_PORT: 8081
       MANAGEMENT_SERVER_PORT: 8081
-      EUREKA_DEFAULT_ZONE: http://eureka-server:8761/eureka
+      EUREKA_DEFAULT_ZONE: ${EUREKA_URL}
     depends_on:
       eureka-server:
         condition: service_healthy
@@ -186,9 +180,45 @@ services:
       start_period: 20s
     restart: unless-stopped
 
-networks:
-  default:
-    name: bpnet
+  # --- Auth Service (internal only) ---
+  auth-service:
+    build:
+      context: .
+      dockerfile: auth-service/Dockerfile
+    image: auth-service:local
+    container_name: auth-service
+    environment:
+      SPRING_APPLICATION_NAME: auth-service
+      SERVER_PORT: 8084
+      MANAGEMENT_SERVER_PORT: 8084
+
+      # Eureka
+      EUREKA_DEFAULT_ZONE: ${EUREKA_URL}
+
+      # Postgres
+      SPRING_DATASOURCE_URL: jdbc:postgresql://${POSTGRES_HOST:-postgres}:${POSTGRES_PORT:-5432}/${POSTGRES_DB}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
+
+      # JWT (kept for future use; not exposed yet)
+      AUTH_JWT_SECRET: ${AUTH_JWT_SECRET}
+      AUTH_JWT_EXPIRES_MIN: ${AUTH_JWT_EXPIRES_MIN:-120}
+    depends_on:
+      eureka-server:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8084/actuator/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 10s
+    restart: unless-stopped
 
 volumes:
   pgdata:
+
+networks:
+  default:
+    name: bpnet

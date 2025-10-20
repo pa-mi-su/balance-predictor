@@ -1,125 +1,143 @@
 {
   "info": {
-    "name": "Balance Predictor – API Gateway (DB + Plaid + Ledger + Projected)",
-    "_postman_id": "b74a6d3a-3e64-4d2f-9c9b-gateway",
-    "description": "E2E testing for Balance Predictor microservices via Gateway + Eureka + PostgreSQL + Plaid (sandbox). Includes secure balance selection per account and projected balance computation.",
+    "name": "Balance Predictor – Auth Access Test (Pre/Post Login)",
+    "_postman_id": "99999999-8888-7777-6666-555555555555",
+    "description": "Verifies that only /api/auth endpoints are public while all others are blocked (403) before and after login. Works with current WebSecurityConfig (denyAll).",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
-  "item": [
-    {
-      "name": "Health Checks",
-      "item": [
-        { "name": "Eureka", "request": { "method": "GET", "url": "{{eureka_base}}/actuator/health" } },
-        { "name": "Gateway", "request": { "method": "GET", "url": "{{gateway_base}}/actuator/health" } },
-        { "name": "Ledger", "request": { "method": "GET", "url": "http://localhost:8082/actuator/health" } },
-        { "name": "Plaid", "request": { "method": "GET", "url": "http://localhost:8083/actuator/health" } },
-        { "name": "Balance", "request": { "method": "GET", "url": "http://localhost:8080/actuator/health" } }
-      ]
-    },
-    {
-      "name": "Plaid Service",
-      "item": [
-        {
-          "name": "Sandbox: Create public_token",
-          "request": {
-            "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "url": "{{gateway_base}}/api/plaid/sandbox/public_token/create",
-            "body": { "mode": "raw", "raw": "{ \"userId\": {{userId}} }" }
-          },
-          "event": [{
-            "listen": "test",
-            "script": { "exec": [
-              "pm.test('Status is 200', () => pm.response.to.have.status(200));",
-              "const json = pm.response.json();",
-              "pm.environment.set('public_token', json.public_token);"
-            ] }
-          }]
-        },
-        {
-          "name": "Exchange public_token → access_token",
-          "request": {
-            "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "url": "{{gateway_base}}/api/plaid/item/public_token/exchange",
-            "body": { "mode": "raw", "raw": "{ \"userId\": {{userId}}, \"publicToken\": \"{{public_token}}\" }" }
-          },
-          "event": [{
-            "listen": "test",
-            "script": { "exec": [
-              "pm.test('Status is 200', () => pm.response.to.have.status(200));",
-              "const json = pm.response.json();",
-              "pm.environment.set('access_token', json.access_token);"
-            ] }
-          }]
-        },
-        {
-          "name": "Get ALL Plaid balances",
-          "request": { "method": "GET", "url": "{{gateway_base}}/api/plaid/balance?userId={{userId}}" }
-        },
-        {
-          "name": "Get ONE Plaid balance by accountId",
-          "request": { "method": "GET", "url": "{{gateway_base}}/api/plaid/balance/{{account_id}}?userId={{userId}}" }
-        },
-        {
-          "name": "Get PRIMARY Plaid balance",
-          "request": { "method": "GET", "url": "{{gateway_base}}/api/plaid/balance/primary?userId={{userId}}" }
-        }
-      ]
-    },
-    {
-      "name": "Ledger Service",
-      "item": [
-        {
-          "name": "Add events (write)",
-          "request": {
-            "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "url": "{{gateway_base}}/api/ledger/events?userId={{userId}}",
-            "body": {
-              "mode": "raw",
-              "raw": "[{\"date\":\"2025-10-05\",\"amount\":-50.00,\"description\":\"Groceries\"},{\"date\":\"2025-10-05\",\"amount\":300.00,\"description\":\"Deposit\"}]"
-            }
-          }
-        },
-        {
-          "name": "Get events (read)",
-          "request": { "method": "GET", "url": "{{gateway_base}}/api/ledger/events?userId={{userId}}" }
-        }
-      ]
-    },
-    {
-      "name": "Balance Service",
-      "item": [
-        {
-          "name": "Projected Balance (Primary)",
-          "request": { "method": "GET", "url": "{{gateway_base}}/api/balance/running?userId={{userId}}" }
-        },
-        {
-          "name": "Projected Balance (Specific Account)",
-          "request": { "method": "GET", "url": "{{gateway_base}}/api/balance/running?userId={{userId}}&accountId={{account_id}}" }
-        }
-      ]
-    },
-    {
-      "name": "Full E2E Flow",
-      "item": [
-        { "name": "1. Create sandbox public_token", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "url": "{{gateway_base}}/api/plaid/sandbox/public_token/create", "body": { "mode": "raw", "raw": "{ \"userId\": {{userId}} }" } } },
-        { "name": "2. Exchange token", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "url": "{{gateway_base}}/api/plaid/item/public_token/exchange", "body": { "mode": "raw", "raw": "{ \"userId\": {{userId}}, \"publicToken\": \"{{public_token}}\" }" } } },
-        { "name": "3. Get balances", "request": { "method": "GET", "url": "{{gateway_base}}/api/plaid/balance?userId={{userId}}" } },
-        { "name": "4. Add ledger events", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "url": "{{gateway_base}}/api/ledger/events?userId={{userId}}", "body": { "mode": "raw", "raw": "[{\"date\":\"2025-10-06\",\"amount\":-80.0,\"description\":\"Utilities\"},{\"date\":\"2025-10-06\",\"amount\":500.0,\"description\":\"Paycheck\"}]" } } },
-        { "name": "5. Verify ledger events", "request": { "method": "GET", "url": "{{gateway_base}}/api/ledger/events?userId={{userId}}" } },
-        { "name": "6. Projected Balance (Primary)", "request": { "method": "GET", "url": "{{gateway_base}}/api/balance/running?userId={{userId}}" } },
-        { "name": "7. Projected Balance (Specific Account)", "request": { "method": "GET", "url": "{{gateway_base}}/api/balance/running?userId={{userId}}&accountId={{account_id}}" } }
-      ]
-    }
-  ],
   "variable": [
     { "key": "gateway_base", "value": "http://localhost:8081" },
-    { "key": "eureka_base", "value": "http://localhost:8761" },
+    { "key": "username", "value": "testuser" },
+    { "key": "email", "value": "testuser@example.com" },
+    { "key": "password", "value": "password123" },
     { "key": "userId", "value": "1" },
-    { "key": "public_token", "value": "" },
-    { "key": "access_token", "value": "" },
-    { "key": "account_id", "value": "pNjnZADqlpHdQzXw4eD7cQVln76rpzS8kmX88" }
+    { "key": "bearer_token", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "A) Before Login (open endpoints)",
+      "item": [
+        {
+          "name": "Auth Health",
+          "request": {
+            "method": "GET",
+            "url": "{{gateway_base}}/api/auth/health"
+          },
+          "event": [{
+            "listen": "test",
+            "script": { "exec": [
+              "pm.test('Status 200', function () { pm.response.to.have.status(200); });"
+            ] }
+          }]
+        },
+        {
+          "name": "Register",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{gateway_base}}/api/auth/register",
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"username\": \"{{username}}\", \"email\": \"{{email}}\", \"password\": \"{{password}}\" }"
+            }
+          },
+          "event": [{
+            "listen": "test",
+            "script": { "exec": [
+              "pm.test('Status 200 or 201', function () { pm.expect([200,201]).to.include(pm.response.code); });"
+            ] }
+          }]
+        },
+        {
+          "name": "Login (no token yet)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{gateway_base}}/api/auth/login",
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"username\": \"{{username}}\", \"password\": \"{{password}}\" }"
+            }
+          },
+          "event": [{
+            "listen": "test",
+            "script": { "exec": [
+              "pm.test('Status 200', function () { pm.response.to.have.status(200); });",
+              "pm.test('Contains message', function () { pm.expect(pm.response.text()).to.include('Login successful'); });"
+            ] }
+          }]
+        }
+      ]
+    },
+    {
+      "name": "B) Protected Routes (expect 403)",
+      "item": [
+        {
+          "name": "Auth Secret (should be blocked)",
+          "request": { "method": "GET", "url": "{{gateway_base}}/api/auth/secret" },
+          "event": [{
+            "listen": "test",
+            "script": { "exec": [
+              "pm.test('Status 403', function () { pm.response.to.have.status(403); });"
+            ] }
+          }]
+        },
+        {
+          "name": "Plaid Balance (should be blocked)",
+          "request": { "method": "GET", "url": "{{gateway_base}}/api/plaid/balance?userId={{userId}}" },
+          "event": [{
+            "listen": "test",
+            "script": { "exec": [
+              "pm.test('Status 403', function () { pm.response.to.have.status(403); });"
+            ] }
+          }]
+        },
+        {
+          "name": "Ledger Events (should be blocked)",
+          "request": { "method": "GET", "url": "{{gateway_base}}/api/ledger/events?userId={{userId}}" },
+          "event": [{
+            "listen": "test",
+            "script": { "exec": [
+              "pm.test('Status 403', function () { pm.response.to.have.status(403); });"
+            ] }
+          }]
+        },
+        {
+          "name": "Balance Running (should be blocked)",
+          "request": { "method": "GET", "url": "{{gateway_base}}/api/balance/running?userId={{userId}}" },
+          "event": [{
+            "listen": "test",
+            "script": { "exec": [
+              "pm.test('Status 403', function () { pm.response.to.have.status(403); });"
+            ] }
+          }]
+        }
+      ]
+    },
+    {
+      "name": "C) After Logout (same as before)",
+      "item": [
+        {
+          "name": "Logout (optional endpoint)",
+          "request": { "method": "POST", "url": "{{gateway_base}}/api/auth/logout" },
+          "event": [{
+            "listen": "test",
+            "script": { "exec": [
+              "pm.test('Status 200 or 404 (if not implemented)', function () { pm.expect([200,404]).to.include(pm.response.code); });"
+            ] }
+          }]
+        },
+        {
+          "name": "Check Health after logout",
+          "request": { "method": "GET", "url": "{{gateway_base}}/api/auth/health" },
+          "event": [{
+            "listen": "test",
+            "script": { "exec": [
+              "pm.test('Still 200', function () { pm.response.to.have.status(200); });"
+            ] }
+          }]
+        }
+      ]
+    }
   ]
 }
