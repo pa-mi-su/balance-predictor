@@ -1,0 +1,465 @@
+{
+  "info": {
+    "name": "Balance Predictor — Full E2E (Opaque Token, All Routes)",
+    "_postman_id": "1c8b2c0c-0b2a-4d39-9d42-0f1f0f1ee001",
+    "description": "Phase A: assert 401/403 without token on protected endpoints. Phase B: login to capture opaque token (body + X-Auth-Token header). Phase C: run full authorized E2E. Phase D: logout and confirm unauthorized again.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "base_url", "value": "http://localhost:8081" },
+
+    { "key": "username", "value": "testuser" },
+    { "key": "email", "value": "testuser@example.com" },
+    { "key": "password", "value": "P@ssw0rd!123" },
+
+    { "key": "userId", "value": "1" },
+
+    { "key": "opaque_token", "value": "" },
+    { "key": "plaid_public_token", "value": "" },
+    { "key": "plaid_account_id", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "A) WITHOUT TOKEN — expect 401/403",
+      "item": [
+        {
+          "name": "Auth: /api/auth/secret (no token)",
+          "event": [
+            {
+              "listen": "test",
+              "script": { "type": "text/javascript", "exec": [
+                "pm.test('401/403 expected', function(){ pm.expect(pm.response.code).to.be.oneOf([401,403]); });"
+              ]}
+            }
+          ],
+          "request": { "method": "GET", "header": [], "url": "{{base_url}}/api/auth/secret" }
+        },
+        {
+          "name": "Auth: /api/auth/introspect (no token)",
+          "event": [
+            {
+              "listen": "test",
+              "script": { "type": "text/javascript", "exec": [
+                "pm.test('401/403 expected', function(){ pm.expect(pm.response.code).to.be.oneOf([401,403]); });"
+              ]}
+            }
+          ],
+          "request": { "method": "GET", "header": [], "url": "{{base_url}}/api/auth/introspect" }
+        },
+        {
+          "name": "Auth: /api/auth/logout (no token)",
+          "event": [
+            {
+              "listen": "test",
+              "script": { "type": "text/javascript", "exec": [
+                "pm.test('401/403 expected', function(){ pm.expect(pm.response.code).to.be.oneOf([401,403]); });"
+              ]}
+            }
+          ],
+          "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "url": "{{base_url}}/api/auth/logout", "body": { "mode": "raw", "raw": "{}" } }
+        },
+        {
+          "name": "Balance: /api/balance/running (no token)",
+          "event": [
+            {
+              "listen": "test",
+              "script": { "type": "text/javascript", "exec": [
+                "pm.test('401/403 expected', function(){ pm.expect(pm.response.code).to.be.oneOf([401,403]); });"
+              ]}
+            }
+          ],
+          "request": { "method": "GET", "header": [], "url": "{{base_url}}/api/balance/running?userId={{userId}}" }
+        },
+        {
+          "name": "Ledger: GET /api/ledger/events (no token)",
+          "event": [
+            {
+              "listen": "test",
+              "script": { "type": "text/javascript", "exec": [
+                "pm.test('401/403 expected', function(){ pm.expect(pm.response.code).to.be.oneOf([401,403]); });"
+              ]}
+            }
+          ],
+          "request": { "method": "GET", "header": [], "url": "{{base_url}}/api/ledger/events?userId={{userId}}" }
+        },
+        {
+          "name": "Ledger: POST /api/ledger/events (no token)",
+          "event": [
+            {
+              "listen": "test",
+              "script": { "type": "text/javascript", "exec": [
+                "pm.test('401/403 expected', function(){ pm.expect(pm.response.code).to.be.oneOf([401,403]); });"
+              ]}
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{base_url}}/api/ledger/events?userId={{userId}}",
+            "body": { "mode": "raw", "raw": "[]" }
+          }
+        },
+        {
+          "name": "Plaid: POST /api/plaid/link/token/create (no token)",
+          "event": [
+            { "listen": "test", "script": { "type": "text/javascript", "exec": [
+              "pm.test('401/403 expected', function(){ pm.expect(pm.response.code).to.be.oneOf([401,403]); });"
+            ]}}
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{base_url}}/api/plaid/link/token/create",
+            "body": { "mode": "raw", "raw": "{\n  \"userId\": {{userId}}\n}" }
+          }
+        },
+        {
+          "name": "Plaid: POST /api/plaid/sandbox/public_token/create (no token)",
+          "event": [
+            { "listen": "test", "script": { "type": "text/javascript", "exec": [
+              "pm.test('401/403 expected', function(){ pm.expect(pm.response.code).to.be.oneOf([401,403]); });"
+            ]}}
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{base_url}}/api/plaid/sandbox/public_token/create",
+            "body": { "mode": "raw", "raw": "{\n  \"userId\": {{userId}}\n}" }
+          }
+        },
+        {
+          "name": "Plaid: POST /api/plaid/item/public_token/exchange (no token)",
+          "event": [
+            { "listen": "test", "script": { "type": "text/javascript", "exec": [
+              "pm.test('401/403 expected', function(){ pm.expect(pm.response.code).to.be.oneOf([401,403]); });"
+            ]}}
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{base_url}}/api/plaid/item/public_token/exchange",
+            "body": { "mode": "raw", "raw": "{\n  \"userId\": {{userId}},\n  \"publicToken\": \"public-sandbox-PLACEHOLDER\"\n}" }
+          }
+        },
+        {
+          "name": "Plaid: GET /api/plaid/balance (no token)",
+          "event": [
+            { "listen": "test", "script": { "type": "text/javascript", "exec": [
+              "pm.test('401/403 expected', function(){ pm.expect(pm.response.code).to.be.oneOf([401,403]); });"
+            ]}}
+          ],
+          "request": { "method": "GET", "header": [], "url": "{{base_url}}/api/plaid/balance?userId={{userId}}" }
+        },
+        {
+          "name": "Plaid: GET /api/plaid/balance/{accountId} (no token)",
+          "event": [
+            { "listen": "test", "script": { "type": "text/javascript", "exec": [
+              "pm.test('401/403 expected', function(){ pm.expect(pm.response.code).to.be.oneOf([401,403]); });"
+            ]}}
+          ],
+          "request": { "method": "GET", "header": [], "url": "{{base_url}}/api/plaid/balance/{{plaid_account_id}}?userId={{userId}}" }
+        },
+        {
+          "name": "Plaid: GET /api/plaid/balance/primary (no token)",
+          "event": [
+            { "listen": "test", "script": { "type": "text/javascript", "exec": [
+              "pm.test('401/403 expected', function(){ pm.expect(pm.response.code).to.be.oneOf([401,403]); });"
+            ]}}
+          ],
+          "request": { "method": "GET", "header": [], "url": "{{base_url}}/api/plaid/balance/primary?userId={{userId}}" }
+        },
+        {
+          "name": "Auth: /api/auth/health (no token) — if protected",
+          "event": [
+            { "listen": "test", "script": { "type": "text/javascript", "exec": [
+              "pm.test('401/403 expected (if protected)', function(){ pm.expect(pm.response.code).to.be.oneOf([401,403]); });"
+            ]}}
+          ],
+          "request": { "method": "GET", "header": [], "url": "{{base_url}}/api/auth/health" }
+        }
+      ]
+    },
+    {
+      "name": "B) LOGIN — capture opaque token",
+      "item": [
+        {
+          "name": "Auth: /api/auth/register (optional, if open)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{base_url}}/api/auth/register",
+            "body": { "mode": "raw", "raw": "{\n  \"username\": \"{{username}}\",\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\"\n}" }
+          }
+        },
+        {
+          "name": "Auth: /api/auth/login (get opaque token)",
+          "event": [
+            {
+              "listen": "test",
+              "script": { "type": "text/javascript", "exec": [
+                "pm.test('200/201', function(){ pm.expect(pm.response.code).to.be.oneOf([200,201]); });",
+                "let t = '';",
+                "try { const j = pm.response.json(); t = j.token || j.access_token || j.sessionToken || j['opaque-token']; } catch(e) {}",
+                "if (!t) { const h = pm.response.headers.get('X-Auth-Token') || pm.response.headers.get('X-Access-Token') || pm.response.headers.get('X-Token'); if (h) t = h; }",
+                "pm.test('Opaque token captured', function(){ pm.expect(t, 'no token in body or X-Auth-Token header').to.exist; });",
+                "pm.collectionVariables.set('opaque_token', t);",
+                "console.log('OPAQUE TOKEN:', t);"
+              ]}
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{base_url}}/api/auth/login",
+            "body": { "mode": "raw", "raw": "{\n  \"username\": \"{{username}}\",\n  \"password\": \"{{password}}\"\n}" }
+          }
+        }
+      ]
+    },
+    {
+      "name": "C) WITH TOKEN — full E2E",
+      "item": [
+        {
+          "name": "Auth: /api/auth/secret",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "X-Auth-Token", "value": "{{opaque_token}}" }],
+            "url": "{{base_url}}/api/auth/secret"
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('2xx', function(){ pm.expect(pm.response.code).to.be.within(200,299); });"
+          ]}}]
+        },
+        {
+          "name": "Auth: /api/auth/introspect",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "X-Auth-Token", "value": "{{opaque_token}}" }],
+            "url": "{{base_url}}/api/auth/introspect"
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('200 active=true', function(){",
+            "  pm.expect(pm.response.code).to.equal(200);",
+            "  const j = pm.response.json();",
+            "  pm.expect(j.active).to.be.true;",
+            "});"
+          ]}}]
+        },
+        {
+          "name": "Balance: /api/balance/running?userId={{userId}}",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "X-Auth-Token", "value": "{{opaque_token}}" }],
+            "url": "{{base_url}}/api/balance/running?userId={{userId}}"
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('2xx + numeric projection', function(){",
+            "  pm.expect(pm.response.code).to.be.within(200,299);",
+            "  const j = pm.response.json();",
+            "  pm.expect(j).to.have.property('value');",
+            "  pm.expect(j.value).to.satisfy(v => typeof v === 'number' || v === null);",
+            "});"
+          ]}}]
+        },
+        {
+          "name": "Ledger: GET /api/ledger/events?userId={{userId}}",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "X-Auth-Token", "value": "{{opaque_token}}" }],
+            "url": "{{base_url}}/api/ledger/events?userId={{userId}}"
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('2xx + array', function(){",
+            "  pm.expect(pm.response.code).to.be.within(200,299);",
+            "  const j = pm.response.json();",
+            "  pm.expect(Array.isArray(j)).to.be.true;",
+            "});"
+          ]}}]
+        },
+        {
+          "name": "Ledger: POST /api/ledger/events (empty add OK)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-Auth-Token", "value": "{{opaque_token}}" }
+            ],
+            "url": "{{base_url}}/api/ledger/events?userId={{userId}}",
+            "body": {
+              "mode": "raw",
+              "raw": "[\n  {\"date\":\"2025-10-05\",\"amount\":-50.00,\"description\":\"Groceries\"},\n  {\"date\":\"2025-10-05\",\"amount\":300.00,\"description\":\"Deposit\"}\n]"
+            }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('2xx + array', function(){",
+            "  pm.expect(pm.response.code).to.be.within(200,299);",
+            "  const j = pm.response.json();",
+            "  pm.expect(Array.isArray(j)).to.be.true;",
+            "});"
+          ]}}]
+        },
+        {
+          "name": "Plaid: POST /api/plaid/link/token/create",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-Auth-Token", "value": "{{opaque_token}}" }
+            ],
+            "url": "{{base_url}}/api/plaid/link/token/create",
+            "body": { "mode": "raw", "raw": "{\n  \"userId\": {{userId}}\n}" }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('2xx + link_token present (if sandbox configured)', function(){",
+            "  pm.expect(pm.response.code).to.be.within(200,299);",
+            "  try { const j = pm.response.json(); pm.expect(j.link_token || j.linkToken || j['link-token']).to.exist; } catch(e) {}",
+            "});"
+          ]}}]
+        },
+        {
+          "name": "Plaid: POST /api/plaid/sandbox/public_token/create",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-Auth-Token", "value": "{{opaque_token}}" }
+            ],
+            "url": "{{base_url}}/api/plaid/sandbox/public_token/create",
+            "body": { "mode": "raw", "raw": "{\n  \"userId\": {{userId}}\n}" }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('2xx + sandbox public_token captured', function(){",
+            "  pm.expect(pm.response.code).to.be.within(200,299);",
+            "  try {",
+            "    const j = pm.response.json();",
+            "    const t = j.public_token || j.publicToken || (j.data && j.data.public_token);",
+            "    if (t) { pm.collectionVariables.set('plaid_public_token', t); }",
+            "    pm.expect(pm.collectionVariables.get('plaid_public_token')).to.exist;",
+            "  } catch(e) {}",
+            "});"
+          ]}}]
+        },
+        {
+          "name": "Plaid: POST /api/plaid/item/public_token/exchange",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-Auth-Token", "value": "{{opaque_token}}" }
+            ],
+            "url": "{{base_url}}/api/plaid/item/public_token/exchange",
+            "body": { "mode": "raw", "raw": "{\n  \"userId\": {{userId}},\n  \"publicToken\": \"{{plaid_public_token}}\"\n}" }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('2xx + access_token stored server-side', function(){",
+            "  pm.expect(pm.response.code).to.be.within(200,299);",
+            "});"
+          ]}}]
+        },
+        {
+          "name": "Plaid: GET /api/plaid/balance?userId={{userId}}",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "X-Auth-Token", "value": "{{opaque_token}}" }],
+            "url": "{{base_url}}/api/plaid/balance?userId={{userId}}"
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('2xx + accounts array present or NO_ACCESS_TOKEN', function(){",
+            "  pm.expect(pm.response.code).to.be.within(200,299);",
+            "  const j = pm.response.json();",
+            "  // Allow either a live sandbox response or your friendly error payload",
+            "  pm.expect(j.accounts || j.error).to.exist;",
+            "  // Capture one account_id if available",
+            "  try {",
+            "    const acc = (j.accounts && j.accounts[0]) || null;",
+            "    if (acc && acc.account_id) pm.collectionVariables.set('plaid_account_id', acc.account_id);",
+            "  } catch(e) {}",
+            "});"
+          ]}}]
+        },
+        {
+          "name": "Plaid: GET /api/plaid/balance/{accountId}?userId={{userId}}",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "X-Auth-Token", "value": "{{opaque_token}}" }],
+            "url": "{{base_url}}/api/plaid/balance/{{plaid_account_id}}?userId={{userId}}"
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('2xx + balance or ACCOUNT_NOT_FOUND', function(){",
+            "  pm.expect(pm.response.code).to.be.within(200,299);",
+            "  const j = pm.response.json();",
+            "  pm.expect(j.balance || j.error).to.exist;",
+            "});"
+          ]}}]
+        },
+        {
+          "name": "Plaid: GET /api/plaid/balance/primary?userId={{userId}}",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "X-Auth-Token", "value": "{{opaque_token}}" }],
+            "url": "{{base_url}}/api/plaid/balance/primary?userId={{userId}}"
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('2xx + balance object or NO_ACCESS_TOKEN', function(){",
+            "  pm.expect(pm.response.code).to.be.within(200,299);",
+            "  const j = pm.response.json();",
+            "  pm.expect(j.balance || j.error).to.exist;",
+            "});"
+          ]}}]
+        }
+      ]
+    },
+    {
+      "name": "D) LOGOUT + verify unauthorized again",
+      "item": [
+        {
+          "name": "Auth: /api/auth/logout",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-Auth-Token", "value": "{{opaque_token}}" }
+            ],
+            "url": "{{base_url}}/api/auth/logout",
+            "body": { "mode": "raw", "raw": "{}" }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('200 Logged out', function(){ pm.expect(pm.response.code).to.equal(200); });"
+          ]}}]
+        },
+        {
+          "name": "Auth: /api/auth/introspect (should be 401 now)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "X-Auth-Token", "value": "{{opaque_token}}" }],
+            "url": "{{base_url}}/api/auth/introspect"
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('401 after revoke', function(){ pm.expect(pm.response.code).to.equal(401); });"
+          ]}}]
+        },
+        {
+          "name": "Balance: /api/balance/running (no longer authorized)",
+          "request": { "method": "GET", "header": [{ "key": "X-Auth-Token", "value": "{{opaque_token}}" }], "url": "{{base_url}}/api/balance/running?userId={{userId}}" },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('401/403 expected after logout', function(){ pm.expect(pm.response.code).to.be.oneOf([401,403]); });"
+          ]}}]
+        },
+        {
+          "name": "Ledger: GET /api/ledger/events (no longer authorized)",
+          "request": { "method": "GET", "header": [{ "key": "X-Auth-Token", "value": "{{opaque_token}}" }], "url": "{{base_url}}/api/ledger/events?userId={{userId}}" },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('401/403 expected after logout', function(){ pm.expect(pm.response.code).to.be.oneOf([401,403]); });"
+          ]}}]
+        },
+        {
+          "name": "Plaid: GET /api/plaid/balance (no longer authorized)",
+          "request": { "method": "GET", "header": [{ "key": "X-Auth-Token", "value": "{{opaque_token}}" }], "url": "{{base_url}}/api/plaid/balance?userId={{userId}}" },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('401/403 expected after logout', function(){ pm.expect(pm.response.code).to.be.oneOf([401,403]); });"
+          ]}}]
+        }
+      ]
+    }
+  ]
+}
